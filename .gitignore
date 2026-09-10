@@ -1,21 +1,32 @@
-# Environment variables and secrets
+# Secrets
 .env
+.env.local
+.env.*.local
 
-# Virtual environment
+# Virtual environments
 .venv/
+venv/
 
-# Python
+# Python bytecode
 __pycache__/
 *.py[cod]
-*.egg-info/
+*$py.class
 
-# Testing
+# Package metadata and build output
+*.egg-info/
+build/
+dist/
+
+# Pytest and coverage
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 
-# Logs and generated output
+# Logs
 *.log
+
+# Generated application outputs
 outputs/*
 !outputs/.gitkeep
 
