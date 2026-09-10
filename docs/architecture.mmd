@@ -1,0 +1,51 @@
+flowchart TD
+    USER[Human User]
+
+    subgraph SYSTEM[Financial Analysis Automation]
+        ORCH[Python Orchestrator]
+
+        subgraph AGENTS[Specialized Agents]
+            PLAN[Research Planning]
+            SOURCE[Source Selection]
+            ANALYZE[Financial Analysis]
+            VALIDATE[Evidence Validation]
+            REPORT[Report Writing]
+        end
+
+        subgraph TOOLS[Deterministic Tools]
+            WEB[Web Search and Scraping]
+            CALC[Financial Calculations]
+            FILES[Markdown and JSON Writers]
+        end
+    end
+
+    OUTPUT[Research Report]
+
+    USER -->|Investment research prompt| ORCH
+
+    ORCH --> PLAN
+    PLAN --> SOURCE
+    SOURCE --> WEB
+    WEB --> ANALYZE
+    ANALYZE --> CALC
+    CALC --> ANALYZE
+    ANALYZE --> VALIDATE
+
+    VALIDATE -->|Approved| REPORT
+    VALIDATE -.->|Correction needed| ORCH
+
+    REPORT --> FILES
+    FILES --> OUTPUT
+    OUTPUT -->|Human review| USER
+
+    classDef human fill:#E8F0FE,stroke:#1A73E8,color:#0B1F33,stroke-width:2px;
+    classDef orchestrator fill:#FFF3E0,stroke:#EF6C00,color:#4E2600,stroke-width:2px;
+    classDef agent fill:#E8F5E9,stroke:#2E7D32,color:#123A16,stroke-width:2px;
+    classDef tool fill:#F3E5F5,stroke:#7B1FA2,color:#32103E,stroke-width:1.5px;
+    classDef output fill:#E0F7FA,stroke:#00838F,color:#003B40,stroke-width:2px;
+
+    class USER human;
+    class ORCH orchestrator;
+    class PLAN,SOURCE,ANALYZE,VALIDATE,REPORT agent;
+    class WEB,CALC,FILES tool;
+    class OUTPUT output;
