@@ -171,3 +171,60 @@ class ConfidenceLevel(StrEnum):
     MODERATE = "moderate"
     LOW = "low"
     INSUFFICIENT = "insufficient"
+
+class ValidationOutcome(StrEnum):
+    """Possible outcomes of evidence validation."""
+
+    APPROVED = "approved"
+    ANALYSIS_CORRECTION_REQUIRED = (
+        "analysis_correction_required"
+    )
+    ADDITIONAL_RESEARCH_REQUIRED = (
+        "additional_research_required"
+    )
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    REJECTED = "rejected"
+
+
+class ValidationSeverity(StrEnum):
+    """Severity levels for validation findings."""
+
+    INFORMATION = "information"
+    WARNING = "warning"
+    ERROR = "error"
+    BLOCKING = "blocking"
+
+
+class ValidationCategory(StrEnum):
+    """Supported validation-finding categories."""
+
+    UNSUPPORTED_CLAIM = "unsupported_claim"
+    INVALID_CITATION = "invalid_citation"
+    IRRELEVANT_CITATION = "irrelevant_citation"
+    MISSING_EVIDENCE = "missing_evidence"
+    CALCULATION_INPUT_PROBLEM = (
+        "calculation_input_problem"
+    )
+    INCOMPATIBLE_COMPARISON = "incompatible_comparison"
+    UNDISCLOSED_CONFLICT = "undisclosed_conflict"
+    MISSING_RISK_OR_LIMITATION = (
+        "missing_risk_or_limitation"
+    )
+    OVERSTATED_CONFIDENCE = "overstated_confidence"
+    PROMPT_ALIGNMENT_FAILURE = "prompt_alignment_failure"
+    HUMAN_REVIEW_BOUNDARY_FAILURE = (
+        "human_review_boundary_failure"
+    )
+
+
+class CorrectionTarget(StrEnum):
+    """Components that may receive a validation correction."""
+
+    SOURCE_SELECTION = "source_selection"
+    RETRIEVAL = "retrieval"
+    PARSING = "parsing"
+    FINANCIAL_CALCULATION = "financial_calculation"
+    FINANCIAL_ANALYSIS = "financial_analysis"
+    ORCHESTRATOR = "orchestrator"
+    REPORT_WRITING = "report_writing"
+    HUMAN_CLARIFICATION = "human_clarification"
