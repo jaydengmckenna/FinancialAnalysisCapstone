@@ -228,3 +228,26 @@ class CorrectionTarget(StrEnum):
     ORCHESTRATOR = "orchestrator"
     REPORT_WRITING = "report_writing"
     HUMAN_CLARIFICATION = "human_clarification"
+
+class ReportType(StrEnum):
+    """Supported final report types."""
+
+    RESEARCH_REPORT = "research_report"
+    INSUFFICIENT_EVIDENCE_REPORT = (
+        "insufficient_evidence_report"
+    )
+
+
+class ArtifactType(StrEnum):
+    """Supported generated artifact types."""
+
+    MARKDOWN_REPORT = "markdown_report"
+    JSON_WORKFLOW = "json_workflow"
+
+
+class ArtifactStatus(StrEnum):
+    """Possible artifact-generation outcomes."""
+
+    PENDING = "pending"
+    CREATED = "created"
+    FAILED = "failed"

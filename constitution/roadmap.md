@@ -404,7 +404,7 @@ Phase 3 depended on completion of Phase 2.
 
 ### Status
 
-In Progress
+Completed
 
 ### Goal
 
@@ -638,30 +638,293 @@ Required validation includes:
 
 #### 4.8 Validation Contracts
 
-Status: **Not Started**
+Status: **Completed**
 
 Implementation:
 
-- Update `src/fin_automation/models/common.py`
-- Create `src/fin_automation/models/validation.py`
-- Create `tests/test_models/test_validation.py`
+- Update `src/fin_automation/models/common.py`.
+- Create `src/fin_automation/models/validation.py`.
+- Create `tests/test_models/test_validation.py`.
 
 Contracts:
 
 - `ValidationFinding`
 - `ValidationResult`
 
+Shared enums:
+
+- `ValidationOutcome`
+- `ValidationSeverity`
+- `ValidationCategory`
+- `CorrectionTarget`
+
 Required validation includes:
 
 - Correction details for blocking findings.
-- No blocking findings in approved results
+- An affected claim for unsupported-claim findings.
+- An affected calculation for calculation-input findings.
+- Source or evidence references for citation findings.
+- Unique source and evidence identifiers.
+- No blocking findings in approved results.
+- At least one finding for analysis-correction outcomes.
+- At least one additional research request for additional-research
+  outcomes.
+- At least one blocking finding for rejected outcomes.
+- Matching workflow identifiers for nested findings.
+- Matching workflow identifiers for additional research requests.
+- Unique approved-record identifiers.
+- Timezone-aware validation timestamps.
+- JSON serialization and reconstruction.
+
+#### 4.9 Report Contracts
+
+Status: **Not Started**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`.
+- Create `src/fin_automation/models/reports.py`.
+- Create `tests/test_models/test_reports.py`.
+
+Contracts:
+
+- `ReportDraft`
+- `ReportArtifact`
+- `WorkflowArtifact`
+
+Shared enums:
+
+- `ReportType`
+- `ArtifactType`
+- `ArtifactStatus`
+
+Required validation includes:
+
+- Nonempty report titles.
+- Nonempty Markdown report content.
+- A valid validation-result reference.
+- Approved candidate-analysis references.
+- Approved source references.
+- Approved evidence references.
+- Approved calculation references.
+- Unique record identifiers.
+- A recommendation outcome consistent with the validation result.
+- No preferred candidate for insufficient-evidence reports.
+- Required risk and limitation sections.
+- Required human-review language.
+- Predictable output file names.
+- Output paths restricted to the approved output directory.
+- Required report artifacts for completed workflow artifacts.
+- Timezone-aware creation timestamps.
+- JSON serialization and reconstruction.
+
+#### 4.10 Workflow Contracts
+
+Status: **Not Started**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`.
+- Create `src/fin_automation/models/workflow.py`.
+- Create `tests/test_models/test_workflow.py`.
+
+Contracts:
+
+- `WorkflowError`
+- `StageResult`
+- `WorkflowState`
+
+Shared enums:
+
+- `WorkflowStatus`
+- `StageStatus`
+- `ErrorSeverity`
+- Additional `WorkflowStage` values when required
+
+Required validation includes:
+
+- Nonnegative retry counters.
+- Attempt numbers beginning at one.
+- Unique record identifiers.
+- A start timestamp for every stage result.
+- A completion timestamp for completed stages.
+- Error details for failed stages.
+- No error details for successful stages.
+- Completion timestamps that do not precede start timestamps.
+- Matching workflow identifiers across nested records.
+- A valid current workflow stage.
+- A completion timestamp for completed workflows.
+- No completion timestamp for workflows that have not completed.
+- Final report-artifact references for completed workflows.
+- Structured workflow errors for failed workflows.
+- Timezone-aware workflow timestamps.
+- JSON serialization and reconstruction.
+
+### Implementation Process
+
+Each Phase 4 implementation unit shall follow this process:
+
+1. Review the corresponding section of `specs/data-contracts.md`.
+2. Identify the required enums and dependent models.
+3. Implement one bounded model group.
+4. Add tests for its application-specific validation rules.
+5. Run the focused test file.
+6. Run the complete test suite.
+7. Review the Git changes.
+8. Commit the completed unit.
+9. Update the implementation-unit status in this roadmap.
+
+Focused tests shall be run using the corresponding test file.
+
+For example:
+
+```bash
+python -m pytest tests/test_models/test_validation.py -v
+```
+
+The complete test suite shall then be run:
+
+```bash
+python -m pytest -v
+```
+
+Git changes shall be reviewed before committing:
+
+```bash
+git status
+git --no-pager diff --cached --stat
+```
+
+### Scope Boundary
+
+Phase 4 implements project foundations and data contracts only.
+
+Phase 4 includes:
+
+- Python project configuration.
+- Environment-variable validation.
+- Custom exception definitions.
+- Logging configuration.
+- Shared enumerations.
+- Pydantic data models.
+- Field-level validation.
+- Cross-field validation.
+- Nested-model validation.
+- JSON serialization and reconstruction tests.
+
+Phase 4 does not implement:
+
+- Agent prompts.
+- Agent execution.
+- OpenAI requests.
+- Tavily searches.
+- Source-selection logic.
+- Webpage retrieval.
+- HTML parsing.
+- Evidence-extraction logic.
+- Financial-calculation functions.
+- Candidate-analysis logic.
+- Recommendation-generation logic.
+- Evidence-validation logic.
+- Report-generation logic.
+- Markdown or JSON file-writing logic.
+- Workflow orchestration.
+
+Those behaviors begin in Phases 5 through 9.
+
+### Exit Criteria
+
+Phase 4 is complete when:
+
+- The application runs in the approved Python virtual environment.
+- Required dependencies install from `requirements.txt`.
+- The project can be installed in editable mode.
+- `.env` is excluded from version control.
+- `.venv` is excluded from version control.
+- Python bytecode caches are excluded from version control.
+- Pytest caches are excluded from version control.
+- Generated package metadata is excluded from version control.
+- The source package imports successfully.
+- Application configuration is validated.
+- Secret values are protected from accidental display.
+- Logging is configured without exposing secret values.
+- Custom application exceptions are defined.
+- Intake contracts are implemented and tested.
+- Research-planning contracts are implemented and tested.
+- Source and evidence contracts are implemented and tested.
+- Financial contracts are implemented and tested.
+- Validation contracts are implemented and tested.
+- Report contracts are implemented and tested.
+- Workflow contracts are implemented and tested.
+- All approved Phase 4 Pydantic contracts are implemented.
+- Required and optional fields match `specs/data-contracts.md`.
+- Shared enums contain the approved values.
+- Required text fields reject blank values.
+- Unknown fields are rejected where required.
+- Duplicate identifiers are rejected where required.
+- Nested records use matching workflow identifiers.
+- Invalid status and field combinations fail validation.
+- Cross-field validation rules have automated tests.
+- Time-related records require timezone-aware timestamps.
+- Models serialize to JSON successfully.
+- Serialized models can be reconstructed successfully.
+- Reconstructed models match their original model instances.
+- Focused tests for every implementation unit pass.
+- The complete test suite passes.
+- Phase 4 changes are committed to Git.
+- The working tree is clean after the final Phase 4 commit.
+- The roadmap is updated to mark Phase 4 as completed.
+
+### Phase 4 Completion Verification
+
+Before Phase 4 is marked complete, run:
+
+```bash
+python -m pytest -v
+```
+
+Verify the package can be imported:
+
+```bash
+python - <<'PY'
+from fin_automation.config import get_settings
+from fin_automation.models.financial import RecommendationResult
+from fin_automation.models.intake import IntakeResult
+from fin_automation.models.reports import ReportDraft
+from fin_automation.models.research import ResearchPlan
+from fin_automation.models.sources import ExtractedEvidence
+from fin_automation.models.validation import ValidationResult
+from fin_automation.models.workflow import WorkflowState
+
+print("Phase 4 modules imported successfully.")
+PY
+```
+
+Verify the Git working tree:
+
+```bash
+git status
+```
+
+The expected final Git status is:
+
+```text
+nothing to commit, working tree clean
+```
+
+### Dependencies
+
+Phase 4 depends on completion of Phase 3.
+
+Phase 5 shall not be marked complete until the Phase 4 contracts required
+by its web-research components have been implemented and tested.
 
 
 ## Phase 5: Web Research Vertical Slice
 
 ### Status
 
-Not Started
+In Progress
 
 ### Goal
 
