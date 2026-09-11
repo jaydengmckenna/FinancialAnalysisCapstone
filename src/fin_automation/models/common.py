@@ -84,3 +84,30 @@ class WorkflowStage(StrEnum):
     ARTIFACT_WRITING = "artifact_writing"
     HUMAN_REVIEW = "human_review"
 
+class SourceSelectionStatus(StrEnum):
+    """Possible outcomes of source selection."""
+
+    READY_FOR_RETRIEVAL = "ready_for_retrieval"
+    ADDITIONAL_SEARCH_REQUIRED = "additional_search_required"
+    INSUFFICIENT_CANDIDATE_SOURCES = (
+        "insufficient_candidate_sources"
+    )
+
+
+class RetrievalStatus(StrEnum):
+    """Possible outcomes of webpage retrieval."""
+
+    SUCCESS = "success"
+    FAILED = "failed"
+    UNSUPPORTED_CONTENT = "unsupported_content"
+    BLOCKED = "blocked"
+    TIMED_OUT = "timed_out"
+
+
+class ParsingStatus(StrEnum):
+    """Possible outcomes of webpage parsing."""
+
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    NOT_ATTEMPTED = "not_attempted"

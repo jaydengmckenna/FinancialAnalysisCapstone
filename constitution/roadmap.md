@@ -547,7 +547,7 @@ Shared enums:
 
 #### 4.5 Research-Planning Contracts
 
-Status: **Next**
+Status: **Completed**
 
 Implementation:
 
