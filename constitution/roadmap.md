@@ -580,7 +580,7 @@ Required validation includes:
 
 #### 4.6 Source and Evidence Contracts
 
-Status: **Not Started**
+Status: **Completed**
 
 Implementation:
 
@@ -609,7 +609,7 @@ Required validation includes:
 
 #### 4.7 Financial Contracts
 
-Status: **Not Started**
+Status: **Completed**
 
 Implementation:
 

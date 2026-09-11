@@ -111,3 +111,63 @@ class ParsingStatus(StrEnum):
     PARTIAL = "partial"
     FAILED = "failed"
     NOT_ATTEMPTED = "not_attempted"
+
+class DataAvailabilityStatus(StrEnum):
+    """Availability states for financial data and analysis categories."""
+
+    AVAILABLE = "available"
+    MISSING = "missing"
+    UNAVAILABLE = "unavailable"
+    INVALID = "invalid"
+    INSUFFICIENT = "insufficient"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class CalculationType(StrEnum):
+    """Deterministic calculations supported by the initial version."""
+
+    REVENUE_GROWTH = "revenue_growth"
+    NET_PROFIT_MARGIN = "net_profit_margin"
+    OPERATING_PROFIT_MARGIN = "operating_profit_margin"
+    DEBT_TO_EQUITY = "debt_to_equity"
+    PRICE_TO_EARNINGS = "price_to_earnings"
+    WEIGHTED_SCORE = "weighted_score"
+
+
+class CalculationStatus(StrEnum):
+    """Possible outcomes of a deterministic calculation."""
+
+    COMPLETED = "completed"
+    MISSING_INPUT = "missing_input"
+    INVALID_INPUT = "invalid_input"
+    NOT_APPLICABLE = "not_applicable"
+    FAILED = "failed"
+
+
+class AnalysisStatus(StrEnum):
+    """Possible outcomes of candidate analysis."""
+
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    NOT_COMPARABLE = "not_comparable"
+    FAILED = "failed"
+
+
+class RecommendationOutcome(StrEnum):
+    """Supported preliminary recommendation outcomes."""
+
+    RANKED_RECOMMENDATION = "ranked_recommendation"
+    QUALIFIED_RECOMMENDATION = "qualified_recommendation"
+    RESEARCH_SHORTLIST = "research_shortlist"
+    NO_ALIGNED_CANDIDATE = "no_aligned_candidate"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+
+
+class ConfidenceLevel(StrEnum):
+    """Supported evidence-confidence levels."""
+
+    HIGH = "high"
+    MODERATE = "moderate"
+    LOW = "low"
+    INSUFFICIENT = "insufficient"
