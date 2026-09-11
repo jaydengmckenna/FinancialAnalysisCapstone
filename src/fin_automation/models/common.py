@@ -251,3 +251,35 @@ class ArtifactStatus(StrEnum):
     PENDING = "pending"
     CREATED = "created"
     FAILED = "failed"
+
+
+class WorkflowStatus(StrEnum):
+    """Possible overall workflow states."""
+
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    WAITING_FOR_CLARIFICATION = "waiting_for_clarification"
+    CORRECTION_REQUIRED = "correction_required"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class StageStatus(StrEnum):
+    """Possible execution states for one workflow stage."""
+
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    WAITING = "waiting"
+
+
+class ErrorSeverity(StrEnum):
+    """Severity levels for structured workflow errors."""
+
+    INFORMATION = "information"
+    WARNING = "warning"
+    ERROR = "error"
+    CRITICAL = "critical"
