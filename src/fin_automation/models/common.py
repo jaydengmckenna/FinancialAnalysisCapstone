@@ -43,3 +43,44 @@ class AssetType(StrEnum):
 
     PUBLIC_STOCK = "public_stock"
     ADR = "adr"
+
+
+class SearchPurpose(StrEnum):
+    """Supported purposes for web-search queries."""
+
+    CANDIDATE_DISCOVERY = "candidate_discovery"
+    FINANCIAL_GROWTH = "financial_growth"
+    PROFITABILITY = "profitability"
+    BALANCE_SHEET = "balance_sheet"
+    VALUATION = "valuation"
+    COMPETITIVE_POSITION = "competitive_position"
+    RISK_RESEARCH = "risk_research"
+    SOURCE_CORROBORATION = "source_corroboration"
+
+
+class SourceCategory(StrEnum):
+    """Supported source-quality categories."""
+
+    PRIMARY = "primary"
+    SECONDARY = "secondary"
+    DISCOVERY = "discovery"
+    UNSUPPORTED = "unsupported"
+
+
+class WorkflowStage(StrEnum):
+    """Stages that may create or receive workflow records."""
+
+    REQUEST_INTAKE = "request_intake"
+    INTAKE_VALIDATION = "intake_validation"
+    RESEARCH_PLANNING = "research_planning"
+    WEB_SEARCH = "web_search"
+    SOURCE_SELECTION = "source_selection"
+    WEB_RETRIEVAL = "web_retrieval"
+    CONTENT_PARSING = "content_parsing"
+    FINANCIAL_ANALYSIS = "financial_analysis"
+    EVIDENCE_VALIDATION = "evidence_validation"
+    REPORT_WRITING = "report_writing"
+    REPORT_VALIDATION = "report_validation"
+    ARTIFACT_WRITING = "artifact_writing"
+    HUMAN_REVIEW = "human_review"
+

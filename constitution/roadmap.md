@@ -400,7 +400,7 @@ Phase 3 depended on completion of Phase 2.
 
 ---
 
-## Phase 4: Project Structure and Development Environment
+## Phase 4: Project Structure and Data-Contract Implementation
 
 ### Status
 
@@ -408,115 +408,254 @@ In Progress
 
 ### Goal
 
-Create a reproducible and testable Python project foundation that supports
-implementation of the approved architecture.
+Create a reproducible Python project foundation and implement the Pydantic
+models defined in `specs/data-contracts.md`.
+
+Phase 4 converts the approved data-contract specification into tested
+Python models before the agents and workflow logic are implemented.
 
 ### Planned Deliverables
 
-- Python source-directory structure.
-- Test-directory structure.
+- Python source and test structure.
 - `requirements.txt`
 - `.env.example`
 - `.gitignore`
-- Python virtual-environment instructions.
-- Application configuration module.
+- `pyproject.toml`
+- Application configuration.
+- Custom exception hierarchy.
 - Logging configuration.
-- Custom exception definitions.
-- Initial Pydantic model modules.
-- Initial model-validation tests.
-- Package-import tests.
+- Pydantic data-contract models.
+- Model-validation tests.
+- JSON serialization and deserialization tests.
 
-### Planned Repository Structure
+### Repository Structure
 
 ```text
-financial-analysis-automation/
-├── README.md
-├── COPILOT.md
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── constitution/
-├── specs/
-├── docs/
-├── outputs/
-├── src/
-│   └── financial_analysis_automation/
-│       ├── __init__.py
-│       ├── config.py
-│       ├── exceptions.py
-│       ├── logging_config.py
-│       └── models/
-│           ├── __init__.py
-│           ├── common.py
-│           ├── intake.py
-│           ├── research.py
-│           ├── sources.py
-│           ├── financial.py
-│           ├── validation.py
-│           ├── reports.py
-│           └── workflow.py
-└── tests/
+src/
+└── fin_automation/
     ├── __init__.py
-    ├── fixtures/
-    ├── test_config.py
-    └── test_models/
+    ├── config.py
+    ├── exceptions.py
+    ├── logging_config.py
+    └── models/
+        ├── common.py
+        ├── intake.py
+        ├── research.py
+        ├── sources.py
+        ├── financial.py
+        ├── validation.py
+        ├── reports.py
+        └── workflow.py
+
+tests/
+├── test_config.py
+├── test_exceptions.py
+├── test_logging_config.py
+└── test_models/
+    ├── test_intake.py
+    ├── test_research.py
+    ├── test_sources.py
+    ├── test_financial.py
+    ├── test_validation.py
+    ├── test_reports.py
+    └── test_workflow.py
 ```
 
-The source structure may be refined when implementation reveals a clear
-need, but changes must remain consistent with the approved data contracts
-and architecture.
+Files shall be created when their implementation unit begins rather than
+as empty placeholders.
 
-### Initial Pydantic Implementation Scope
+### Implementation Order
 
-Phase 4 will initially implement:
+Phase 4 shall be implemented in the following order.
 
-- Shared enums and common types.
+#### 4.1 Project Configuration
+
+Status: **Completed**
+
+Implementation:
+
+- `src/fin_automation/config.py`
+- `tests/test_config.py`
+
+Includes:
+
+- Environment-variable loading.
+- Required-setting validation.
+- Secret-value protection.
+- OpenAI base-URL validation.
+- Isolated configuration testing.
+
+#### 4.2 Exception Hierarchy
+
+Status: **Completed**
+
+Implementation:
+
+- `src/fin_automation/exceptions.py`
+- `tests/test_exceptions.py`
+
+Includes:
+
+- Common application exception.
+- Configuration errors.
+- Workflow errors.
+- Research, retrieval, and parsing errors.
+- Calculation errors.
+- Evidence-validation errors.
+- Report-generation errors.
+
+#### 4.3 Logging Configuration
+
+Status: **Completed**
+
+Implementation:
+
+- `src/fin_automation/logging_config.py`
+- `tests/test_logging_config.py`
+
+Includes:
+
+- Standard application logging.
+- Configurable logging levels.
+- Prevention of duplicate handlers.
+- Configured secret-value redaction.
+
+#### 4.4 Intake Contracts
+
+Status: **Completed**
+
+Implementation:
+
+- `src/fin_automation/models/common.py`
+- `src/fin_automation/models/intake.py`
+- `tests/test_models/test_intake.py`
+
+Contracts:
+
 - `ResearchRequest`
 - `InvestorProfile`
 - `ResearchScope`
 - `IntakeResult`
-- `ResearchPlan`
+
+Shared enums:
+
+- `RiskTolerance`
+- `InvestmentObjective`
+- `TimeHorizon`
+- `RequestType`
+- `AssetType`
+
+#### 4.5 Research-Planning Contracts
+
+Status: **Next**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`
+- Create `src/fin_automation/models/research.py`
+- Create `tests/test_models/test_research.py`
+
+Contracts:
+
 - `EvidenceRequirement`
 - `SearchQuery`
+- `ResearchPlan`
+- `AdditionalResearchRequest`
+
+Shared enums:
+
+- `SearchPurpose`
+- `SourceCategory`
+- Required `WorkflowStage` values
+
+Required validation includes:
+
+- Nonempty research objective.
+- At least one comparison criterion.
+- At least one evidence requirement.
+- At least one search query.
+- Unique nested identifiers.
+- Valid search-query references to evidence requirements.
+- Bounded candidate and source limits.
+
+#### 4.6 Source and Evidence Contracts
+
+Status: **Not Started**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`
+- Create `src/fin_automation/models/sources.py`
+- Create `tests/test_models/test_sources.py`
+
+Contracts:
+
 - `SearchResult`
+- `SelectedSource`
 - `SourceSelection`
+- `RetrievalResult`
 - `SourceRecord`
 - `ExtractedEvidence`
+
+Required validation includes:
+
+- Supported public HTTP URLs.
+- Valid search-query references.
+- Evidence-requirement references for selected results.
+- Selected sources for ready-for-retrieval outcomes.
+- Error information for failed retrievals.
+- Source references for extracted evidence.
+- Currency, unit, and reporting-period preservation when available.
+
+#### 4.7 Financial Contracts
+
+Status: **Not Started**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`
+- Create `src/fin_automation/models/financial.py`
+- Create `tests/test_models/test_financial.py`
+
+Contracts:
+
 - `FinancialInput`
 - `CalculationRecord`
+- `CategoryEvaluation`
 - `CandidateAnalysis`
 - `RecommendationResult`
+
+Required validation includes:
+
+- Numeric values for available financial inputs.
+- No usable values for missing or non-applicable inputs.
+- Results for completed calculations.
+- Scores between zero and one hundred.
+- No low substitute score for missing data.
+- Preferred candidate for ranked recommendations.
+- No preferred candidate for insufficient-evidence outcomes.
+- Mandatory human review.
+
+#### 4.8 Validation Contracts
+
+Status: **Not Started**
+
+Implementation:
+
+- Update `src/fin_automation/models/common.py`
+- Create `src/fin_automation/models/validation.py`
+- Create `tests/test_models/test_validation.py`
+
+Contracts:
+
 - `ValidationFinding`
 - `ValidationResult`
-- `ReportDraft`
-- `WorkflowState`
-- `WorkflowError`
 
-Models may be implemented incrementally rather than in one large code
-generation step.
+Required validation includes:
 
-### Exit Criteria
+- Correction details for blocking findings.
+- No blocking findings in approved results
 
-Phase 4 is complete when:
-
-- The application runs in a Python 3.12.3 virtual environment.
-- Required packages install from `requirements.txt`.
-- Secrets are loaded through environment variables.
-- `.env` and `.venv` are excluded from version control.
-- The source package imports successfully.
-- Pytest starts successfully.
-- Logging is configured without exposing secret values.
-- Custom exceptions can be imported.
-- Core Pydantic models can be constructed and serialized.
-- Invalid model data produces expected validation failures.
-- Model tests pass.
-- The directory structure matches the approved architecture.
-
-### Dependencies
-
-Phase 4 depends on completion of Phase 3.
-
----
 
 ## Phase 5: Web Research Vertical Slice
 
