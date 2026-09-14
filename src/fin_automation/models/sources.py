@@ -8,7 +8,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
-    HttpUrl,
+    AnyHttpUrl,
     field_validator,
     model_validator,
 )
@@ -33,51 +33,90 @@ class SourceBaseModel(BaseModel):
 
 
 class SearchResult(SourceBaseModel):
-    """One structured result returned by the web-search tool."""
+    """Validated search result returned by Tavily."""
 
-    search_result_id: UUID = Field(default_factory=uuid4)
-    workflow_id: UUID
-    query_id: UUID
-    title: str = Field(min_length=1)
-    url: HttpUrl
-    snippet: str | None = None
-    domain: str = Field(min_length=1)
-    result_position: int | None = Field(default=None, ge=1)
-    retrieved_from_search_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
+    search_result_id: UUID = Field(
+        default_factory=uuid4,
     )
 
-    @field_validator("retrieved_from_search_at")
+    workflow_id: UUID
+
+    query_id: UUID
+
+    title: str = Field(
+        min_length=1,
+    )
+
+    url: AnyHttpUrl
+
+    snippet: str | None = None
+
+    raw_content: str | None = None
+
+    domain: str = Field(
+        min_length=1,
+    )
+
+    result_position: int = Field(
+        ge=1,
+    )
+
+    retrieved_at: datetime = Field(
+        default_factory=lambda: datetime.now(
+            timezone.utc
+        )
+    )
+
+    @field_validator("retrieved_at")
     @classmethod
     def validate_timezone_aware_datetime(
         cls,
         value: datetime,
     ) -> datetime:
-        """Require a timezone-aware search timestamp."""
+        """Require a timezone-aware retrieval timestamp."""
 
-        if value.tzinfo is None or value.utcoffset() is None:
+        if value.tzinfo is None:
             raise ValueError(
-                "retrieved_from_search_at must be timezone-aware."
+                "retrieved_at must be timezone-aware."
             )
 
         return value
-
-
 class SelectedSource(SourceBaseModel):
-    """The source-selection decision for one search result."""
+    """Search result reviewed by the Source Selection Agent."""
 
-    selection_id: UUID = Field(default_factory=uuid4)
-    search_result_id: UUID
-    selected: bool
-    selection_reason: str = Field(min_length=1)
-    candidate_name: str | None = None
-    evidence_requirement_ids: list[UUID] = Field(
-        default_factory=list
+    selection_id: UUID = Field(
+        default_factory=uuid4,
     )
+
+    search_result_id: UUID
+
+    url: AnyHttpUrl
+
+    title: str = Field(
+        min_length=1,
+    )
+
+    domain: str = Field(
+        min_length=1,
+    )
+
+    raw_content: str | None = None
+
+    candidate_name: str | None = None
+
+    selected: bool
+
     expected_source_category: SourceCategory
-    possible_duplicate: bool = False
-    possible_derivative_source: bool = False
+
+    selection_reason: str = Field(
+        min_length=1,
+    )
+
     exclusion_reason: str | None = None
+
+    evidence_requirement_ids: list[UUID] = Field(
+        default_factory=list,
+    )
 
     @field_validator("evidence_requirement_ids")
     @classmethod
@@ -226,8 +265,8 @@ class RetrievalResult(SourceBaseModel):
     retrieval_id: UUID = Field(default_factory=uuid4)
     workflow_id: UUID
     search_result_id: UUID
-    requested_url: HttpUrl
-    final_url: HttpUrl | None = None
+    requested_url: AnyHttpUrl
+    final_url: AnyHttpUrl | None = None
     status: RetrievalStatus
     http_status_code: int | None = Field(
         default=None,
@@ -283,7 +322,7 @@ class SourceRecord(SourceBaseModel):
     retrieval_id: UUID
     search_result_id: UUID
     title: str = Field(min_length=1)
-    url: HttpUrl
+    url: AnyHttpUrl
     publisher: str | None = None
     author: str | None = None
     publication_date: date | None = None

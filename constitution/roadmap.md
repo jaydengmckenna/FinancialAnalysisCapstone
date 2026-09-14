@@ -949,7 +949,7 @@ next unit begins.
 
 ### Status
 
-In Progress
+Completed
 
 ### Goal
 
@@ -1054,183 +1054,168 @@ Phase 5A is complete when:
 
 ---
 
-## Phase 5B: Search, Source Selection, and Retrieval
+## Phase 5B: Search and Source Selection
 
 ### Status
 
-Not Started
+Completed
 
-### Goal
+### Objective
 
-Execute approved search queries, convert external search responses into
-validated internal records, select appropriate sources, and retrieve the
-selected public webpages.
+Convert a validated `ResearchPlan` into a validated
+`SourceSelection` containing relevant public sources and extracted
+source content for downstream financial analysis.
 
-### Inputs
-
-- `ResearchPlan`
-- `EvidenceRequirement`
-- `SearchQuery`
-
-### Outputs
-
-- `SearchResult`
-- `SelectedSource`
-- `SourceSelection`
-- `AdditionalResearchRequest`, when applicable
-- `RetrievalResult`
-- Retrieved webpage content for Phase 5C
-
-### Planned Deliverables
-
-- Tavily client wrapper.
-- Tavily Web Search Tool.
-- Tavily response mapper.
-- Structured `SearchResult` conversion.
-- Approved-query execution.
-- URL-validation utility.
-- URL-normalization utility.
-- Duplicate URL detection.
-- Tracking-parameter handling.
-- Source Selection Agent.
-- Deterministic source-selection guardrails.
-- HTTP session configuration.
-- HTTP retrieval utility using Requests.
-- Explicit connection and read timeouts.
-- Bounded retry behavior.
-- Redirect handling.
-- Content-type validation.
-- Response-size limits.
-- Search and retrieval error handling.
-- Mocked Tavily-response fixtures.
-- Mocked HTTP-response fixtures.
-- Search, selection, and retrieval tests.
-
-### Planned Workflow
+### Implemented Workflow
 
 1. Receive a validated `ResearchPlan`.
 2. Read the approved `SearchQuery` records.
-3. Execute each approved query through Tavily.
-4. Convert Tavily responses into validated `SearchResult` records.
-5. Normalize result URLs.
-6. identify duplicate or equivalent result URLs.
-7. Submit valid results to the Source Selection Agent.
-8. Associate selected results with evidence requirements.
-9. Record exclusion reasons for rejected results.
-10. Determine whether additional research is required.
-11. Produce a validated `SourceSelection`.
-12. Validate selected public URLs.
-13. Retrieve selected webpages.
-14. Record redirect and final-URL information.
-15. Record HTTP status and content type.
-16. Convert retrieval outcomes into validated `RetrievalResult` records.
-17. Pass successful webpage content to Phase 5C.
+3. Provide the complete research plan to the Source Selection Agent.
+4. Allow the agent to invoke the Tavily search tool using only approved
+   query text, query identifiers, and workflow identifiers.
+5. Execute each selected query through the Tavily Search API.
+6. Request search-result metadata and extracted source content using
+   `include_raw_content=True`.
+7. Convert Tavily responses into validated `SearchResult` records.
+8. Store complete `SearchResult` records inside the Tavily search tool
+   for the duration of the source-selection run.
+9. Return lightweight search-result metadata to the agent to avoid
+   placing complete webpage content in the agent context.
+10. Allow the Source Selection Agent to evaluate result relevance,
+    source category, candidate association, and evidence coverage.
+11. Require the agent to associate selected results with approved
+    evidence requirements.
+12. Require the agent to record selection reasons and exclusion reasons.
+13. Require the agent to determine whether the available results are
+    ready for downstream analysis, require additional search, or are
+    insufficient.
+14. Submit the source-selection decision through a structured
+    `SubmitSourceSelectionTool`.
+15. Remove application-generated identifiers and timestamps from the
+    submitted payload so Python and Pydantic generate them.
+16. Hydrate each submitted decision by looking up its original
+    `SearchResult` using `search_result_id`.
+17. Attach the original title, URL, domain, and raw source content to
+    each `SelectedSource`.
+18. Validate the completed payload as a `SourceSelection`.
+19. Validate workflow, plan, candidate, and evidence-requirement
+    references.
+20. Return selected source content for Phase 5C financial analysis and
+    evidence extraction.
 
-### Tavily Boundary
+### Implemented Components
 
-Tavily is used to execute approved web searches.
+- `prompts/source_selection.py`
+  - Defines Source Selection Agent instructions.
+  - Serializes the complete `ResearchPlan`.
+  - Enforces approved-query usage.
+  - Defines structured search and submission behavior.
 
-The Tavily client wrapper shall:
+- `tools/tavily_search.py`
+  - Implements the Tavily search capability as a `smolagents` tool.
+  - Executes approved search queries.
+  - Requests extracted source content.
+  - Maps provider responses into validated `SearchResult` records.
+  - Applies a maximum raw-content character limit.
+  - Stores complete search results by `search_result_id`.
+  - Returns lightweight result metadata to the agent.
 
-- Receive the API key from validated settings.
-- Never log or expose the API key.
-- Execute only approved query strings.
-- Apply bounded result limits.
-- Return raw search responses to a separate mapper.
-- Convert external failures into application-specific errors.
+- `agents/source_selection.py`
+  - Implements the Source Selection Agent using
+    `smolagents.ToolCallingAgent`.
+  - Provides the Tavily search and structured submission tools.
+  - Coordinates search, selection, and final validation.
+  - Verifies workflow, plan, candidate, status, and evidence references.
 
-Tavily search responses shall not be treated as internal data contracts.
-The response mapper shall convert them into validated `SearchResult`
-records.
+- `tools/source_selection_submission.py`
+  - Accepts the agent's structured source-selection decision.
+  - Removes identifiers and timestamps generated by the application.
+  - Hydrates source decisions from stored `SearchResult` records.
+  - Attaches original source metadata and raw content.
+  - Validates and stores the final `SourceSelection`.
 
-### Source Selection Agent Boundary
+- `models/sources.py`
+  - Stores extracted content on `SearchResult.raw_content`.
+  - Stores selected source metadata and content on `SelectedSource`.
+  - Preserves `search_result_id` for lineage.
 
-The Source Selection Agent may:
+- `scripts/smoke_test_source_selection.py`
+  - Performs a live Source Selection Agent smoke test.
+  - Confirms Tavily tool invocation.
+  - Confirms source-selection submission.
+  - Confirms source metadata and raw content are preserved.
 
-- Evaluate candidate relevance.
-- Evaluate evidence-requirement relevance.
-- Recommend which results should proceed to retrieval.
-- Explain why results were selected or excluded.
-- Identify possible duplicates or derivative sources.
-- Request additional bounded research.
+### Validation Completed
 
-The Source Selection Agent shall not:
+The live smoke test confirmed:
 
-- Execute arbitrary searches.
-- Download webpages directly.
-- Parse HTML.
-- Extract financial evidence.
-- Perform calculations.
-- Produce recommendations.
+- The Source Selection Agent received a validated `ResearchPlan`.
+- The agent invoked the Tavily search tool.
+- Tavily returned relevant public search results.
+- Extracted raw content was returned for the selected sources.
+- Search results were converted into validated `SearchResult` records.
+- The agent selected relevant primary sources.
+- Selected sources were linked to the intended candidate.
+- The submission tool accepted a structured source-selection decision.
+- Source decisions were hydrated from stored search results.
+- Each selected source retained its title, URL, domain, and raw content.
+- The final result was validated as a `SourceSelection`.
+- Selected source content is available for Phase 5C.
 
-### Retrieval Boundary
+### Intentional Scope Decisions
 
-Webpage retrieval shall be performed by deterministic Python code.
+The following features were intentionally excluded to keep the
+capstone focused on demonstrating agentic AI orchestration:
 
-The retrieval utility shall control:
+- Deterministic duplicate-URL detection.
+- URL canonicalization and tracking-parameter removal.
+- A separate Requests-based webpage-retrieval pipeline.
+- Redirect-chain tracking.
+- HTTP-status and content-type recording.
+- A separate Tavily Extract API call.
+- A persistent search-result database.
+- Permanent storage of intermediate source-selection artifacts.
 
-- Supported URL schemes.
-- Connection timeouts.
-- Read timeouts.
-- Retry limits.
-- Redirect limits.
-- Accepted content types.
-- Maximum response size.
-- User-agent behavior.
-- Retrieval-error conversion.
+Instead, Phase 5B uses Tavily search with `include_raw_content=True` to
+retrieve search metadata and extracted source content in one bounded
+tool call.
 
-### Scope Boundary
+### Data Handoff to Phase 5C
 
-Phase 5B includes:
+Phase 5C receives a validated `SourceSelection`.
 
-- Approved-query execution.
-- Tavily integration.
-- Search-result conversion.
-- URL validation and normalization.
-- Duplicate detection.
-- Source-selection decisions.
-- Public webpage retrieval.
-- Retrieval-status recording.
+Each selected `SelectedSource` may contain:
 
-Phase 5B does not include:
+- `search_result_id`
+- `title`
+- `url`
+- `domain`
+- `candidate_name`
+- `expected_source_category`
+- `selection_reason`
+- `evidence_requirement_ids`
+- `raw_content`
 
-- Free-form agent search loops.
-- HTML content interpretation.
-- Evidence extraction.
-- Financial calculations.
-- Candidate scoring.
-- Recommendation generation.
-- Report writing.
+The raw content is currently stored in the returned Python object for
+the duration of the workflow. Permanent artifact storage will be
+addressed only if required when the full orchestrated workflow is
+assembled.
 
 ### Exit Criteria
 
-Phase 5B is complete when:
-
-- An approved `SearchQuery` can be submitted to Tavily.
-- Tavily responses are converted into validated `SearchResult` records.
-- Search-result records preserve workflow and query identifiers.
-- Invalid search results are rejected or recorded explicitly.
-- Duplicate URLs are identified deterministically.
-- The Source Selection Agent produces a validated `SourceSelection`.
-- Selected sources reference evidence requirements.
-- Excluded sources contain exclusion reasons.
-- Additional-research outcomes contain bounded research requests.
-- Unsupported sources do not proceed to retrieval.
-- Selected public webpages can be retrieved.
-- Final URLs are preserved after redirects.
-- Request timeouts are handled explicitly.
-- HTTP failures are handled explicitly.
-- Unsupported content types are handled explicitly.
-- Retrieval failures do not crash the complete workflow.
-- Successful retrievals produce validated `RetrievalResult` records.
-- Search and retrieval remain separate operations.
-- Unit tests use mocked Tavily and HTTP responses.
-- Live Tavily tests are excluded from the default test suite.
-- Search, selection, and retrieval tests pass.
-- The complete test suite passes.
-
----
-
+- [x] A validated `ResearchPlan` can initiate source selection.
+- [x] The agent can invoke Tavily using approved search queries.
+- [x] Tavily responses are converted into `SearchResult` records.
+- [x] Search results retain query and workflow lineage.
+- [x] The Source Selection Agent can select and exclude results.
+- [x] Selected results reference approved evidence requirements.
+- [x] Selection and exclusion reasons are recorded.
+- [x] Additional-research outcomes are supported.
+- [x] The agent submits its decision through a structured tool.
+- [x] Python hydrates selected records from original search results.
+- [x] Selected records retain URLs and extracted source content.
+- [x] The final output is validated as `SourceSelection`.
+- [x] Selected source content is ready for Phase 5C.
 ## Phase 5C: Parsing and Evidence Extraction
 
 ### Status

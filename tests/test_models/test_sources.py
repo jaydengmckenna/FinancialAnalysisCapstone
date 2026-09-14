@@ -45,17 +45,32 @@ def create_search_result(
 def create_selected_source(
     search_result_id: UUID,
 ) -> SelectedSource:
-    """Create a valid selected-source decision."""
+    """Create a valid selected source using the current schema."""
 
     return SelectedSource(
         search_result_id=search_result_id,
+        url=(
+            "https://investors.example.com/"
+            "annual-report"
+        ),
+        title="Company A Annual Report",
+        domain="investors.example.com",
+        raw_content=(
+            "Company A reported annual revenue growth "
+            "in its annual report."
+        ),
         selected=True,
         selection_reason=(
             "The annual report contains primary financial evidence."
         ),
+        exclusion_reason=None,
         candidate_name="Company A",
-        evidence_requirement_ids=[uuid4()],
-        expected_source_category=SourceCategory.PRIMARY,
+        evidence_requirement_ids=[
+            uuid4()
+        ],
+        expected_source_category=(
+            SourceCategory.PRIMARY
+        ),
     )
 
 
@@ -67,7 +82,7 @@ def test_search_result_accepts_valid_data() -> None:
     assert result.title == "Company A Annual Report"
     assert result.url.scheme == "https"
     assert result.result_position == 1
-    assert result.retrieved_from_search_at.tzinfo is not None
+    assert result.retrieved_at.tzinfo is not None
 
 
 @pytest.mark.parametrize(
@@ -102,15 +117,20 @@ def test_selected_source_requires_evidence_requirement() -> None:
     ):
         SelectedSource(
             search_result_id=uuid4(),
+            url="https://example.com/source",
+            title="Example Source",
+            domain="example.com",
+            raw_content="Example source content.",
             selected=True,
             selection_reason="The source appears relevant.",
+            exclusion_reason=None,
+            candidate_name="Company A",
             evidence_requirement_ids=[],
             expected_source_category=SourceCategory.PRIMARY,
         )
 
-
 def test_excluded_source_requires_reason() -> None:
-    """An excluded result must explain its exclusion."""
+    """An excluded source must explain its exclusion."""
 
     with pytest.raises(
         ValidationError,
@@ -118,14 +138,22 @@ def test_excluded_source_requires_reason() -> None:
     ):
         SelectedSource(
             search_result_id=uuid4(),
+            url="https://example.com/source",
+            title="Example Source",
+            domain="example.com",
+            raw_content=None,
             selected=False,
-            selection_reason="The result was reviewed.",
-            expected_source_category=SourceCategory.UNSUPPORTED,
+            selection_reason="The source was reviewed.",
+            exclusion_reason=None,
+            candidate_name="Company A",
+            evidence_requirement_ids=[],
+            expected_source_category=(
+                SourceCategory.UNSUPPORTED
+            ),
         )
 
-
 def test_unsupported_source_cannot_be_selected() -> None:
-    """Unsupported sources cannot proceed to retrieval."""
+    """Unsupported sources cannot proceed to analysis."""
 
     with pytest.raises(
         ValidationError,
@@ -133,12 +161,21 @@ def test_unsupported_source_cannot_be_selected() -> None:
     ):
         SelectedSource(
             search_result_id=uuid4(),
+            url="https://example.com/source",
+            title="Example Source",
+            domain="example.com",
+            raw_content="Example source content.",
             selected=True,
-            selection_reason="The result appears relevant.",
-            evidence_requirement_ids=[uuid4()],
-            expected_source_category=SourceCategory.UNSUPPORTED,
+            selection_reason="The source appears relevant.",
+            exclusion_reason=None,
+            candidate_name="Company A",
+            evidence_requirement_ids=[
+                uuid4()
+            ],
+            expected_source_category=(
+                SourceCategory.UNSUPPORTED
+            ),
         )
-
 
 def test_ready_selection_requires_selected_source() -> None:
     """Ready status requires at least one selected source."""
