@@ -35,3 +35,29 @@ class EvidenceValidationError(FinancialAutomationError):
 
 class ReportGenerationError(FinancialAutomationError):
     """Raised when a report or output artifact cannot be generated."""
+
+class ClarificationRequiredError(WorkflowError):
+    """Raised when research cannot proceed without user clarification."""
+
+    def __init__(
+        self,
+        missing_fields: list[str],
+        clarification_questions: list[str],
+    ) -> None:
+        """Initialize the clarification requirement.
+
+        Args:
+            missing_fields: Required fields absent from intake.
+            clarification_questions: Questions that should be presented
+                to the user.
+        """
+
+        self.missing_fields = list(missing_fields)
+        self.clarification_questions = list(
+            clarification_questions
+        )
+
+        super().__init__(
+            "Research planning cannot continue because user "
+            "clarification is required."
+        )

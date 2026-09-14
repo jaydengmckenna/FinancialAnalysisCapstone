@@ -22,6 +22,7 @@ from fin_automation.models.intake import (
     ResearchScope,
 )
 
+from fin_automation.exceptions import ClarificationRequiredError
 
 def create_complete_intake_result(
     workflow_id: UUID,
@@ -511,3 +512,128 @@ def test_interpret_intake_rejects_blank_prompt_before_run() -> None:
         )
 
     planner.run.assert_not_called()
+
+def test_clarification_gate_allows_complete_intake() -> None:
+    """Complete intake should pass the clarification gate."""
+
+    intake_result = create_complete_intake_result(
+        workflow_id=uuid4()
+    )
+
+    ResearchPlanner.ensure_ready_for_planning(
+        intake_result=intake_result,
+    )
+
+
+def test_clarification_gate_rejects_incomplete_intake() -> None:
+    """Incomplete intake should stop research planning."""
+
+    intake_result = create_incomplete_intake_result(
+        workflow_id=uuid4()
+    )
+
+    with pytest.raises(
+        ClarificationRequiredError,
+        match="user clarification is required",
+    ):
+        ResearchPlanner.ensure_ready_for_planning(
+            intake_result=intake_result,
+        )
+
+
+def test_clarification_error_preserves_missing_fields() -> None:
+    """The clarification error should preserve missing fields."""
+
+    intake_result = create_incomplete_intake_result(
+        workflow_id=uuid4()
+    )
+
+    with pytest.raises(
+        ClarificationRequiredError,
+    ) as error_info:
+        ResearchPlanner.ensure_ready_for_planning(
+            intake_result=intake_result,
+        )
+
+    error = error_info.value
+
+    assert error.missing_fields == [
+        "risk_tolerance",
+        "investment_objective",
+        "time_horizon",
+    ]
+
+
+def test_clarification_error_preserves_questions() -> None:
+    """The clarification error should preserve user questions."""
+
+    intake_result = create_incomplete_intake_result(
+        workflow_id=uuid4()
+    )
+
+    with pytest.raises(
+        ClarificationRequiredError,
+    ) as error_info:
+        ResearchPlanner.ensure_ready_for_planning(
+            intake_result=intake_result,
+        )
+
+    error = error_info.value
+
+    assert error.clarification_questions == (
+        intake_result.clarification_questions
+    )
+    assert error.clarification_questions
+
+
+def test_interpret_and_validate_returns_complete_intake() -> None:
+    """Guarded interpretation should return complete intake."""
+
+    workflow_id = uuid4()
+    original_prompt = (
+        "Compare three international stocks for long-term growth."
+    )
+
+    expected_result = create_complete_intake_result(
+        workflow_id=workflow_id,
+        original_prompt=original_prompt,
+    )
+
+    planner = create_uninitialized_planner(
+        raw_result=expected_result.model_dump_json()
+    )
+
+    result = planner.interpret_and_validate_intake(
+        original_prompt=original_prompt,
+        workflow_id=workflow_id,
+    )
+
+    assert result == expected_result
+    assert result.requires_clarification is False
+
+
+def test_interpret_and_validate_stops_incomplete_intake() -> None:
+    """Guarded interpretation should stop incomplete intake."""
+
+    workflow_id = uuid4()
+    original_prompt = "Find an investment for me."
+
+    incomplete_result = create_incomplete_intake_result(
+        workflow_id=workflow_id,
+        original_prompt=original_prompt,
+    )
+
+    planner = create_uninitialized_planner(
+        raw_result=incomplete_result.model_dump_json()
+    )
+
+    with pytest.raises(
+        ClarificationRequiredError,
+    ) as error_info:
+        planner.interpret_and_validate_intake(
+            original_prompt=original_prompt,
+            workflow_id=workflow_id,
+        )
+
+    assert error_info.value.missing_fields
+    assert error_info.value.clarification_questions
