@@ -134,6 +134,7 @@ class CalculationType(StrEnum):
     WEIGHTED_SCORE = "weighted_score"
 
 
+
 class CalculationStatus(StrEnum):
     """Possible outcomes of a deterministic calculation."""
 
@@ -143,6 +144,12 @@ class CalculationStatus(StrEnum):
     NOT_APPLICABLE = "not_applicable"
     FAILED = "failed"
 
+class CalculationOperation(StrEnum):
+    """Calculations supported by the minimal Phase 6 implementation."""
+    GROWTH_RATE = "growth_rate"
+    MARGIN = "margin"
+    RATIO = "ratio"
+    DIFFERENCE = "difference"
 
 class AnalysisStatus(StrEnum):
     """Possible outcomes of candidate analysis."""

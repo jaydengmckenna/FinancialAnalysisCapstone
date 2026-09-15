@@ -19,6 +19,7 @@ from fin_automation.models.common import (
     ConfidenceLevel,
     DataAvailabilityStatus,
     RecommendationOutcome,
+    CalculationOperation,
 )
 
 
@@ -174,6 +175,49 @@ class CalculationRecord(FinancialBaseModel):
             raise ValueError(
                 "Candidate name is required for candidate-level "
                 "calculations."
+            )
+
+        return self
+
+
+class CalculatedMetric(FinancialBaseModel):
+    """One deterministic calculation derived from extracted evidence."""
+
+    calculation_id: UUID = Field(default_factory=uuid4)
+    workflow_id: UUID
+    operation: CalculationOperation
+    metric_name: str = Field(min_length=1)
+    candidate_names: list[str] = Field(min_length=1)
+    value: Decimal
+    unit: str | None = None
+    currency: str | None = None
+    input_evidence_ids: list[UUID] = Field(
+        min_length=2,
+        max_length=2,
+    )
+    formula: str = Field(min_length=1)
+    reporting_periods: list[str] = Field(default_factory=list)
+    limitations: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_calculated_metric(self) -> "CalculatedMetric":
+        """Validate calculation lineage and candidate references."""
+
+        if len(set(self.input_evidence_ids)) != 2:
+            raise ValueError(
+                "A calculation requires two distinct evidence records."
+            )
+
+        normalized_candidate_names = [
+            name.casefold()
+            for name in self.candidate_names
+        ]
+
+        if len(normalized_candidate_names) != len(
+            set(normalized_candidate_names)
+        ):
+            raise ValueError(
+                "Calculated-metric candidate names must be unique."
             )
 
         return self

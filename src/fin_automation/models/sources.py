@@ -319,7 +319,7 @@ class SourceRecord(SourceBaseModel):
 
     source_id: UUID = Field(default_factory=uuid4)
     workflow_id: UUID
-    retrieval_id: UUID
+    retrieval_id: UUID | None = None
     search_result_id: UUID
     title: str = Field(min_length=1)
     url: AnyHttpUrl

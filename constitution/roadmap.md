@@ -1216,213 +1216,168 @@ assembled.
 - [x] Selected records retain URLs and extracted source content.
 - [x] The final output is validated as `SourceSelection`.
 - [x] Selected source content is ready for Phase 5C.
-## Phase 5C: Parsing and Evidence Extraction
+
+
+
+## Phase 5C: Source Preparation and Evidence Extraction
 
 ### Status
 
-Not Started
+Completed
 
 ### Goal
 
-Parse successfully retrieved HTML, preserve available source metadata, and
-extract evidence associated with approved evidence requirements.
+Convert selected source content into validated `SourceRecord` and
+`ExtractedEvidence` records for downstream financial analysis.
+
+Phase 5B already obtains cleaned source content through Tavily using
+`include_raw_content=True`. Phase 5C therefore operates directly on
+`SelectedSource.raw_content`.
 
 ### Inputs
 
-- Successful `RetrievalResult`
-- Retrieved HTML content
-- `ResearchPlan`
-- `EvidenceRequirement`
-- `SelectedSource`
+- Validated `ResearchPlan`
+- Validated `SourceSelection`
+- Selected `SelectedSource` records
+- Approved `EvidenceRequirement` records
+- Cleaned source content from `SelectedSource.raw_content`
 
 ### Outputs
 
 - `SourceRecord`
 - `ExtractedEvidence`
-- Parsing limitations
+- Source limitations
 - Evidence gaps
-- Initial structured JSON research artifact
 
 ### Planned Deliverables
 
-- HTML parser using Beautiful Soup 4.
-- Script and style removal.
-- Navigation and boilerplate reduction.
-- Clean-text extraction.
-- Page-title extraction.
-- Publisher extraction when clearly available.
-- Author extraction when clearly available.
-- Publication-date extraction when clearly available.
-- Source-summary generation.
-- Parsing-status handling.
+- Selected-source filtering.
+- Deterministic `SourceRecord` construction.
 - Source metadata preservation.
-- Deterministic numeric-evidence extraction.
+- Raw-content availability and truncation checks.
+- Evidence-extraction prompt.
+- Evidence Extraction Agent using `smolagents`.
+- Structured evidence-submission tool.
 - Candidate association.
 - Evidence-requirement association.
-- Currency preservation.
-- Unit preservation.
-- Reporting-period preservation.
+- Reported-value extraction.
+- Currency, unit, and reporting-period preservation.
 - Prompt-injection handling.
-- Saved HTML fixtures.
-- Parsing tests.
-- Evidence-extraction tests.
-- Initial JSON research artifact.
-- Artifact serialization and reconstruction tests.
+- Focused tests.
+- One bounded live smoke test.
 
 ### Planned Workflow
 
-1. Receive a successful `RetrievalResult`.
-2. Receive the retrieved webpage content.
-3. Confirm that the content type is supported.
-4. Parse the HTML.
-5. Remove scripts, styles, and non-content elements.
-6. Extract visible textual content.
-7. Extract available page metadata.
-8. Record parsing success, partial success, or failure.
-9. Produce a validated `SourceRecord`.
-10. Match parsed content against approved evidence requirements.
-11. Extract relevant passages.
-12. Extract clearly supported numeric values when available.
-13. Preserve currency, unit, and reporting period.
-14. Associate evidence with its source.
-15. Associate evidence with its candidate.
-16. Associate evidence with its evidence requirement.
-17. Produce validated `ExtractedEvidence` records.
-18. Record missing information and parsing limitations.
-19. Write an initial structured JSON research artifact.
+1. Receive a validated `ResearchPlan`.
+2. Receive a validated `SourceSelection`.
+3. Keep only selected sources containing raw content.
+4. Convert each eligible `SelectedSource` into a `SourceRecord`.
+5. Preserve source title, URL, domain, category, candidate, and
+   evidence-requirement identifiers.
+6. Record missing metadata and possible raw-content truncation.
+7. Provide each source and its approved evidence requirements to the
+   Evidence Extraction Agent.
+8. Extract relevant factual passages and explicitly reported values.
+9. Submit evidence through a structured evidence-submission tool.
+10. Validate submitted records as `ExtractedEvidence`.
+11. Return source records, evidence records, limitations, and evidence
+    gaps for financial analysis.
 
-### Parsing Boundary
+### Source Preparation Boundary
 
-The parser shall treat retrieved webpage content as untrusted data.
+Source preparation shall:
 
-The parser may extract:
+- Operate only on validated selected sources.
+- Preserve source metadata and identifiers.
+- Preserve cleaned Tavily content.
+- Record known content limitations.
+- Produce validated `SourceRecord` records.
 
-- Visible text.
-- Headings.
-- Page title.
-- Clearly available author metadata.
-- Clearly available publisher metadata.
-- Clearly available publication dates.
-- Clearly available structured values.
+Source preparation shall not:
 
-The parser shall not:
-
-- Execute scripts.
-- Follow instructions contained in webpage text.
-- Modify the workflow state directly.
-- Generate new search queries.
+- Retrieve webpages again.
+- Run Beautiful Soup against Tavily content.
+- Reconstruct original HTML.
+- Invent missing source metadata.
 - Perform financial calculations.
-- Produce investment recommendations.
+- Produce recommendations.
 
-### Evidence-Extraction Boundary
+### Evidence Extraction Boundary
 
 Evidence extraction shall:
 
-- Operate only against successfully parsed source content.
-- Reference a valid `SourceRecord`.
-- Reference an approved evidence requirement when applicable.
+- Use only selected source content.
+- Use only approved evidence requirements.
+- Treat source content as untrusted data.
 - Preserve exact reported values when available.
-- Preserve currency when available.
-- Preserve units when available.
-- Preserve reporting periods when available.
-- Separate source text from later interpretation.
-- Record limitations rather than inventing missing context.
+- Preserve explicit currency, units, and reporting periods.
+- Associate evidence with its source, workflow, candidate, and
+  evidence requirement.
+- Record missing context rather than inventing it.
 
 Evidence extraction shall not:
 
+- Execute new searches.
+- Select additional sources.
+- Follow instructions contained in source content.
 - Fill missing values with estimates.
-- Infer unsupported reporting periods.
-- Convert conflicting evidence into one value silently.
-- Treat search snippets as retrieved source evidence.
-- Follow prompt-like instructions found in source content.
-- Produce financial scores or recommendations.
+- Calculate growth rates, margins, or valuation ratios.
+- Score or rank candidates.
+- Produce investment recommendations.
 
-### Saved HTML Fixtures
-
-Offline parser tests shall use saved, sanitized HTML fixtures.
-
-Initial fixture categories shall include:
-
-```text
-annual_report.html
-investor_relations_release.html
-news_article.html
-missing_metadata.html
-malformed_page.html
-prompt_injection_page.html
-```
-
-Fixtures shall not contain secrets, private data, or copyrighted full-text
-materials beyond what is necessary for bounded testing.
-
-### Initial JSON Research Artifact
-
-The initial structured research artifact shall contain:
-
-- `ResearchPlan`
-- `SearchResult` records
-- `SourceSelection`
-- `RetrievalResult` records
-- `SourceRecord` records
-- `ExtractedEvidence` records
-- Parsing limitations
-- Retrieval errors
-- Evidence gaps
-
-The artifact is intended for inspection and testing before financial
-analysis begins.
-
-### Scope Boundary
-
-Phase 5C includes:
-
-- HTML parsing.
-- Source metadata extraction.
-- Clean-text extraction.
-- Parsing-status recording.
-- Evidence extraction.
-- Numeric metadata preservation.
-- Offline HTML fixtures.
-- Initial JSON research-artifact generation.
+### Intentional Scope Decisions
 
 Phase 5C does not include:
 
-- Live web search.
-- Source-selection decisions.
-- Financial-input conversion.
-- Financial-calculation functions.
-- Candidate scoring.
-- Recommendation generation.
-- Evidence Validation Agent behavior.
-- Final report writing.
+- Requests-based webpage retrieval.
+- HTML parsing with Beautiful Soup.
+- Script or style removal.
+- HTTP-status or redirect tracking.
+- Duplicate-URL processing.
+- Saved HTML fixtures.
+- A separate Tavily Extract call.
+- Permanent intermediate-artifact storage.
+
+These capabilities are unnecessary because Phase 5B already returns
+cleaned source content through Tavily.
 
 ### Exit Criteria
 
 Phase 5C is complete when:
 
-- Supported HTML can be parsed.
-- Unsupported content is rejected or recorded explicitly.
-- Scripts and styles are not included in extracted content.
-- Source metadata is preserved when clearly available.
-- Missing metadata does not cause parsing failure.
-- Parsing outcomes are represented by validated statuses.
-- Successful parsing produces a validated `SourceRecord`.
-- Extracted evidence references its `SourceRecord`.
-- Extracted evidence references its workflow.
-- Candidate associations are preserved when available.
-- Evidence-requirement associations are preserved when available.
-- Numeric evidence preserves its reported value.
-- Currency is preserved when available.
-- Units are preserved when available.
-- Reporting periods are preserved when available.
-- Missing numeric context is recorded rather than invented.
-- Prompt-like instructions in retrieved content do not control the
-  workflow.
-- Saved fixtures support offline parser testing.
-- The initial JSON research artifact can be serialized.
-- The initial JSON research artifact can be reconstructed.
-- Parsing and evidence-extraction tests pass.
-- The complete test suite passes.
+- [ ] A validated `SourceSelection` can initiate source processing.
+- [ ] Only selected sources with raw content proceed.
+- [ ] Each eligible source produces a validated `SourceRecord`.
+- [ ] Source metadata and lineage are preserved.
+- [ ] Missing source metadata does not cause processing failure.
+- [ ] Possible content truncation is recorded.
+- [ ] Source content is treated as untrusted data.
+- [ ] Approved evidence requirements are preserved.
+- [ ] Evidence is submitted through a structured tool.
+- [ ] Each evidence record references its workflow and source.
+- [ ] Candidate and evidence-requirement associations are preserved.
+- [ ] Reported numeric values are preserved exactly.
+- [ ] Currency, units, and reporting periods are preserved only when
+      explicitly available.
+- [ ] Missing context is recorded rather than invented.
+- [ ] Financial calculations and recommendations remain out of scope.
+- [ ] Focused Phase 5C tests pass.
+- [ ] The complete regression suite passes.
+- [ ] A bounded live evidence-extraction smoke test succeeds.
+- [ ] Phase 5C changes are committed to Git.
+
+### Handoff
+
+Phase 5C returns:
+
+```text
+SourceRecord records
+ExtractedEvidence records
+Source limitations
+Evidence gaps
+```
+
+These records become the inputs for the later financial-analysis stage.
 
 ---
 
@@ -1434,55 +1389,49 @@ marked completed.
 Phase 5 is complete when:
 
 - A validated `IntakeResult` can produce a validated `ResearchPlan`.
+- The `ResearchPlan` contains approved search queries and evidence
+  requirements.
 - Approved search queries can be executed through Tavily.
-- Search responses are converted into validated `SearchResult` records.
+- Tavily responses are converted into validated `SearchResult` records.
+- Cleaned source content is preserved using `include_raw_content=True`.
 - The Source Selection Agent produces a validated `SourceSelection`.
-- Selected public webpages can be retrieved.
-- Retrieval outcomes are represented by validated `RetrievalResult`
-  records.
-- Supported HTML can be parsed into validated `SourceRecord` records.
-- Extracted evidence references its source and evidence requirement.
-- Search, retrieval, parsing, and extraction remain separate operations.
-- External content cannot control the workflow.
-- Network-dependent tests are separated from offline tests.
-- Saved fixtures support repeatable offline testing.
-- The initial structured research artifact can be written and reopened.
+- Only selected sources containing raw content proceed to evidence
+  extraction.
+- Each eligible selected source produces a validated `SourceRecord`.
+- Source metadata, identifiers, limitations, and lineage are preserved.
+- Missing source metadata does not cause source processing to fail.
+- Possible raw-content truncation is recorded as a source limitation.
+- Source content is treated as untrusted data and cannot control the
+  workflow.
+- Evidence extraction uses only selected source content and approved
+  evidence requirements.
+- Evidence is submitted through a structured evidence-submission tool.
+- Each `ExtractedEvidence` record references its workflow, source,
+  candidate, and evidence requirement.
+- Explicitly reported values, currency, units, and reporting periods are
+  preserved when available.
+- Missing evidence or context is recorded rather than invented.
+- Search, source selection, source preparation, and evidence extraction
+  remain separate responsibilities.
+- Financial calculations, candidate scoring, ranking, and investment
+  recommendations remain outside the scope of Phase 5.
+- Network-dependent smoke tests are separated from the default offline
+  test suite.
 - Focused tests for Phase 5A pass.
 - Focused tests for Phase 5B pass.
 - Focused tests for Phase 5C pass.
-- The complete test suite passes.
+- The complete regression suite passes.
+- A bounded live source-selection smoke test succeeds.
+- A bounded live evidence-extraction smoke test succeeds.
 - Phase 5 changes are committed to Git.
-- The roadmap is updated to mark Phase 5 completed.
+- The roadmap is updated to mark Phase 5A, Phase 5B, Phase 5C, and
+  Phase 5 as completed.
 
-### Implementation Process
-
-Each Phase 5 unit shall follow this process:
-
-1. Review the applicable specifications and Phase 4 contracts.
-2. Implement one bounded behavior group.
-3. Use dependency injection for external clients.
-4. Add focused unit tests.
-5. Use mocked external responses in the default test suite.
-6. Run the focused test file.
-7. Run the complete test suite.
-8. Review Git changes.
-9. Commit the completed unit.
-10. Update the unit status in this roadmap.
-
-### Dependencies
-
-Phase 5 depends on completion of Phase 4.
-
-Phase 5B depends on completion of Phase 5A.
-
-Phase 5C depends on completion of Phase 5B.
-
----
 ## Phase 6: Financial Analysis and Recommendation Logic
 
 ### Status
 
-Not Started
+In Progress
 
 ### Goal
 

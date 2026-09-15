@@ -12,6 +12,10 @@ from fin_automation.prompts.source_selection import (
     SOURCE_SELECTION_SYSTEM_PROMPT,
     build_source_selection_messages,
 )
+from fin_automation.prompts.evidence_extraction import (
+    EVIDENCE_EXTRACTION_SYSTEM_PROMPT,
+    build_evidence_extraction_messages,
+)
 
 __all__ = [
     "INTAKE_SYSTEM_PROMPT",
@@ -20,4 +24,6 @@ __all__ = [
     "build_intake_messages",
     "build_research_planning_messages",
     "build_source_selection_messages",
+    "EVIDENCE_EXTRACTION_SYSTEM_PROMPT",
+    "build_evidence_extraction_messages",
 ]
