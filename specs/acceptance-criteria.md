@@ -524,7 +524,8 @@ Maps to:
 **When** validation runs,
 
 **Then** the claim references collected evidence or a traceable
-deterministic calculation.
+deterministic calculation, and any calculated value matches the recorded
+formula, result, units, periods, and input evidence.
 
 Maps to:
 
@@ -624,32 +625,6 @@ Maps to:
 
 - FR-091 through FR-096
 - SR-090 through SR-093
-
-### AC-082: Structured Artifact Written
-
-**Given** a fully validated workflow,
-
-**When** artifact generation completes,
-
-**Then** a valid JSON artifact is written containing the approved structured
-research fields.
-
-Maps to:
-
-- FR-098
-- NFR-103
-
-### AC-083: Output Consistency
-
-**Given** generated Markdown and JSON artifacts from the same workflow,
-
-**When** their material conclusions are compared,
-
-**Then** they describe the same recommendation outcome.
-
-Maps to:
-
-- NFR-014
 
 ### AC-084: Invalid Output Not Marked Complete
 

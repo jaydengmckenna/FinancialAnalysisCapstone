@@ -484,19 +484,27 @@ The report shall disclose that:
 
 ## 19. Deterministic Calculation Requirements
 
-Each implemented financial calculation shall document:
+The current implementation uses one bounded generic calculation tool. Each
+calculation is identified by a metric name and one supported operation:
 
-- Formula.
-- Required inputs.
-- Accepted units.
-- Missing-input behavior.
-- Non-applicable behavior.
-- Output type.
-- Rounding behavior.
-- Tests.
+- Growth or percentage change.
+- Margin.
+- Ratio.
+- Difference.
 
-Calculation details will be finalized during Phase 3 data-contract design
-and Phase 6 implementation planning.
+Each accepted calculation shall preserve:
+
+- The deterministic formula.
+- The two input evidence identifiers.
+- Candidate names.
+- Currency, units, and reporting periods.
+- The rounded `Decimal` result.
+- Any limitations.
+
+Phase 7 validation shall confirm that a research claim using a calculated
+value cites the calculation record and that the calculation's inputs trace
+to relevant evidence. The validation stage does not replace deterministic
+arithmetic with language-model reasoning.
 
 ## 20. Methodology Testing
 
@@ -516,7 +524,8 @@ Tests shall include:
 - Strong evidence with mixed financial results.
 - Candidate that cannot be meaningfully compared.
 - Insufficient-evidence outcome.
-- Deterministic weighted-score calculation.
+- Deterministic generic calculations with growth, margin, ratio, and
+  difference operations.
 
 ## Change Control
 

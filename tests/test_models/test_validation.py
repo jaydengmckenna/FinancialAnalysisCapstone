@@ -1,6 +1,7 @@
 """Tests for evidence-validation data contracts."""
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 import pytest
@@ -18,6 +19,7 @@ from fin_automation.models.research import (
     AdditionalResearchRequest,
 )
 from fin_automation.models.validation import (
+    ValidationClaim,
     ValidationFinding,
     ValidationResult,
 )
@@ -105,6 +107,35 @@ def test_validation_finding_accepts_warning() -> None:
     assert finding.workflow_id == workflow_id
     assert finding.severity == ValidationSeverity.WARNING
     assert finding.finding_id is not None
+
+
+def test_validation_claim_requires_traceable_reference() -> None:
+    """Claims cannot enter validation without a record reference."""
+
+    with pytest.raises(
+        ValidationError,
+        match="requires source, evidence, or calculation references",
+    ):
+        ValidationClaim(
+            workflow_id=uuid4(),
+            text="A claim without a citation.",
+        )
+
+
+def test_calculated_claim_requires_expected_value() -> None:
+    """Calculation-backed claims must expose the value being checked."""
+
+    with pytest.raises(
+        ValidationError,
+        match="requires expected_value",
+    ):
+        ValidationClaim(
+            workflow_id=uuid4(),
+            text="Revenue grew.",
+            calculation_id=uuid4(),
+            expected_unit="percent",
+            expected_value=None,
+        )
 
 
 def test_blocking_finding_requires_correction() -> None:

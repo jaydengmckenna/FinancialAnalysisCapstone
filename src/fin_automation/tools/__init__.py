@@ -9,9 +9,13 @@ from fin_automation.tools.tavily_search import (
 from fin_automation.tools.evidence_submission import (
     SubmitExtractedEvidenceTool,
 )
+from fin_automation.tools.report_writer import (
+    ReportWriterTool,
+)
 
 __all__ = [
     "SubmitSourceSelectionTool",
     "TavilySearchTool",
     "SubmitExtractedEvidenceTool",
+    "ReportWriterTool",
 ]

@@ -30,7 +30,7 @@ The project follows a specification-driven development process:
 5. Build the web-search and scraping vertical slice.
 6. Implement financial calculations and candidate analysis.
 7. Implement evidence validation and safety controls.
-8. Implement report and artifact generation.
+8. Implement Markdown report generation.
 9. Integrate the complete multi-agent workflow.
 10. Complete quality, adversarial, and acceptance testing.
 11. Finalize documentation and prepare the capstone submission.
@@ -57,34 +57,19 @@ The roadmap uses the following statuses:
 | Phase 2: Detailed Specifications | Completed |
 | Phase 3: Data Contracts and Agent Architecture | Completed |
 | Phase 4: Project Structure and Development Environment | Completed |
-| Phase 5: Web Research Vertical Slice | Not Started |
-| Phase 6: Financial Analysis and Recommendation Logic | Not Started |
-| Phase 7: Evidence Validation and Safety | Not Started |
-| Phase 8: Report and Artifact Generation | Not Started |
-| Phase 9: Complete Workflow Integration | Not Started |
+| Phase 5: Web Research Vertical Slice | Completed |
+| Phase 6: Simplified Financial Analysis Slice | Completed |
+| Phase 7: Evidence Validation and Safety | Completed |
+| Phase 8: Markdown Report Generation | In Progress |
+| Phase 9: Complete Product Workflow | Not Started |
 | Phase 10: Testing and Quality Verification | Not Started |
 | Phase 11: Documentation and Submission Preparation | Not Started |
 
 ## Current Focus
 
-The project is currently beginning Phase 4: Project Structure and
-Development Environment.
-
-The current work will include:
-
-- Creating the approved repository structure.
-- Creating the Python source package.
-- Creating the initial test structure.
-- Creating `requirements.txt`.
-- Creating `.env.example`.
-- Creating `.gitignore`.
-- Implementing environment configuration.
-- Implementing logging and exception foundations.
-- Translating the approved data contracts into Pydantic models.
-- Writing the first model-validation tests.
-
-No agent workflow logic will be implemented until the project foundation
-and core contracts can be imported and tested successfully.
+The project is preparing Phase 8: Markdown Report Generation. Phase 7
+is implemented and tested with deterministic claim, citation, calculation,
+safety, and correction-routing validation.
 
 ---
 
@@ -177,7 +162,7 @@ The specifications define:
 - Recommendation outcomes.
 - Claim and citation validation.
 - Risk and limitation disclosure.
-- Report and artifact output.
+- Human-readable Markdown report output.
 - Workflow failure behavior.
 - Human-review requirements.
 - Adversarial safety requirements.
@@ -289,20 +274,19 @@ Deterministic Python code is responsible for:
 - Financial arithmetic.
 - Structural report validation.
 - Markdown file writing.
-- JSON artifact writing.
 - Retry-limit enforcement.
 - Error handling.
 
 ### Approved Financial Tools
 
-The initial Financial Analysis Agent may use:
+The current Financial Analysis Agent may use:
 
-- Revenue-Growth Calculator.
-- Profit-Margin Calculator.
-- Debt-to-Equity Calculator.
-- Price-to-Earnings Calculator.
-- Weighted-Score Calculator.
-- Evidence-Lookup Tool.
+- The generic deterministic financial-calculation tool.
+- Evidence lookup support.
+
+The calculation tool supports growth, margin, ratio, and difference
+operations. The research metric name and evidence requirements define the
+meaning of each calculation.
 
 Currency conversion, liquidity ratios, technical indicators, discounted
 cash-flow models, and advanced market-analysis calculations are not part of
@@ -345,7 +329,6 @@ Important approved contracts include:
 - `ValidationResult`
 - `ReportDraft`
 - `ReportArtifact`
-- `WorkflowArtifact`
 - `WorkflowState`
 - `WorkflowError`
 
@@ -363,7 +346,7 @@ Human User
 → Financial Calculation Tools
 → Evidence Validation Agent
 → Report Writing Agent
-→ Markdown and JSON File Writers
+→ Markdown File Writer
 → Research Report
 → Human Review
 ```
@@ -1427,11 +1410,11 @@ Phase 5 is complete when:
 - The roadmap is updated to mark Phase 5A, Phase 5B, Phase 5C, and
   Phase 5 as completed.
 
-## Phase 6: Financial Analysis and Recommendation Logic
+## Phase 6: Simplified Financial Analysis Slice
 
 ### Status
 
-In Progress
+Completed
 
 ### Goal
 
@@ -1441,30 +1424,27 @@ Agent using the approved recommendation methodology.
 ### Planned Deliverables
 
 - Financial-input validation.
-- Revenue-Growth Calculator.
-- Profit-Margin Calculator.
-- Debt-to-Equity Calculator.
-- Price-to-Earnings Calculator.
-- Weighted-Score Calculator.
-- Evidence-Lookup Tool.
+- Generic deterministic calculation tool.
+- Financial-input validation.
+- Generic growth, margin, ratio, and difference operations.
+- Evidence-backed `CalculatedMetric` records.
 - Financial Analysis Agent.
-- `CategoryEvaluation` implementation.
-- `CandidateAnalysis` implementation.
-- `RecommendationResult` implementation.
-- Calculation and analysis tests.
+- Phase 6 prompts, focused tests, and a bounded smoke test.
 
 ### Initial Analysis Areas
 
-The initial analysis will cover:
+The current calculation slice supports generic operations selected for the
+approved research plan:
 
-- Revenue growth.
-- Net or operating profit margin.
-- Debt-to-equity.
-- Price-to-earnings when applicable.
-- Competitive position when supported by evidence.
-- Material candidate risks.
-- Investor-profile alignment.
-- Weighted candidate comparison when supported.
+- Growth or percentage change.
+- Margin.
+- Ratio.
+- Difference.
+
+The metric name describes the research measure, while the operation
+controls deterministic arithmetic. Candidate interpretation, risks,
+profile alignment, and recommendation validation are handled by the agent
+contracts and later validation stages.
 
 Currency, reporting-period, and unit differences must be preserved and
 qualified.
@@ -1495,11 +1475,12 @@ Phase 6 is complete when:
 - Calculations use deterministic Python functions.
 - The same valid input produces the same result.
 - Missing and non-applicable values are distinguished.
-- P/E returns a non-applicable result for zero or negative earnings.
-- Calculation records preserve their input lineage.
-- Candidate analyses contain favorable and unfavorable evidence.
-- Candidate rankings can be explained.
-- The system can produce an insufficient-evidence outcome.
+- Calculations preserve evidence lineage, units, currencies, and periods.
+- Generic calculation operations are deterministic and tested.
+- Unauthorized or incompatible evidence is rejected.
+- The Financial Analysis Agent is bounded to approved evidence and tools.
+- Analysis and recommendation contracts are available for downstream
+  validation; full report production is out of scope for this phase.
 - Recommendations remain subject to evidence validation and human review.
 - Calculation and Financial Analysis Agent tests pass.
 
@@ -1513,7 +1494,7 @@ Phase 6 depends on completion of Phases 4 and 5.
 
 ### Status
 
-Not Started
+In Progress
 
 ### Goal
 
@@ -1523,9 +1504,9 @@ the original request, and compliant with the project boundaries.
 ### Planned Deliverables
 
 - Evidence Validation Agent.
-- Evidence-Lookup Tool support for validation.
-- Citation-Reference Checker.
-- Deterministic identifier checks.
+- Evidence lookup support for validation.
+- Citation-reference and claim-support checks.
+- Deterministic identifier and calculation-lineage checks.
 - `ValidationFinding` implementation.
 - `ValidationResult` implementation.
 - Correction-routing behavior.
@@ -1536,10 +1517,10 @@ the original request, and compliant with the project boundaries.
 
 The validation stage will check:
 
-- Material claim support.
+- Material claim support against extracted evidence or calculations.
 - Source and evidence identifiers.
 - Citation relevance.
-- Calculation lineage.
+- Calculation lineage and the relationship between claims and math.
 - Candidate and reporting-period compatibility.
 - Missing and conflicting information.
 - Favorable and unfavorable evidence coverage.
@@ -1575,8 +1556,17 @@ Phase 7 is complete when:
 - A forced ranking can be rejected.
 - Scraped prompt-injection content does not control agent behavior.
 - Validation failures route to the correct component.
-- Failed validation prevents an invalid final report.
+- Failed validation prevents invalid data from reaching report generation.
 - Validation and adversarial tests pass.
+
+### Completed Implementation
+
+- `ValidationClaim` contract for material claim references.
+- Deterministic evidence, citation, and calculation-lineage validation.
+- Read-only source, evidence, and calculation lookup support.
+- Evidence Validation Agent boundary.
+- Correction routing grouped by owning workflow component.
+- Prompt-injection and unsafe-language adversarial tests.
 
 ### Dependencies
 
@@ -1584,16 +1574,16 @@ Phase 7 depends on completion of Phases 5 and 6.
 
 ---
 
-## Phase 8: Report and Artifact Generation
+## Phase 8: Markdown Report Generation
 
 ### Status
 
-Not Started
+In Progress
 
 ### Goal
 
-Generate readable, cited, and traceable Markdown and JSON outputs from
-approved workflow data.
+Generate one readable, cited, and traceable Markdown report from approved
+workflow data for human review.
 
 ### Planned Deliverables
 
@@ -1603,10 +1593,9 @@ approved workflow data.
 - `ReportDraft` implementation.
 - Deterministic report-structure validation.
 - Markdown file writer.
-- JSON workflow-artifact writer.
 - Example research report.
 - Example insufficient-evidence report.
-- Report and file-output tests.
+- Report structure and Markdown file-output tests.
 
 ### Required Report Content
 
@@ -1635,7 +1624,6 @@ Phase 8 is complete when:
 - Approved workflow data can be converted into a `ReportDraft`.
 - The report writer cannot introduce unapproved facts.
 - Markdown reports can be written to the configured output directory.
-- Structured workflow results can be written as JSON.
 - Material claims include traceable citations.
 - Risks and limitations are included.
 - Missing and conflicting evidence is disclosed.
@@ -1652,7 +1640,7 @@ Phase 8 depends on completion of Phase 7.
 
 ---
 
-## Phase 9: Complete Workflow Integration
+## Phase 9: Complete Product Workflow
 
 ### Status
 
@@ -1661,8 +1649,10 @@ Not Started
 ### Goal
 
 Connect all agents, deterministic tools, Pydantic contracts, validation
-gates, correction paths, and output writers through the Python
-orchestrator.
+gates, correction paths, and Markdown report output into one complete,
+usable research product. At the end of Phase 9, a user should be able to
+submit a research request and receive a validated Markdown report for human
+review. Broader quality verification belongs to Phase 10.
 
 ### Planned Deliverables
 
@@ -1674,9 +1664,11 @@ orchestrator.
 - Research retry behavior.
 - Analysis correction behavior.
 - Validation routing.
-- Final artifact handling.
-- Integration tests.
+- Markdown report handoff and output-path handling.
+- Bounded retry and correction limits.
+- Structured workflow failure handling.
 - Example end-to-end execution.
+- Product smoke test.
 
 ### Planned Workflow
 
@@ -1695,7 +1687,7 @@ orchestrator.
 13. Route corrections when required.
 14. Generate the approved report.
 15. Validate the report structure.
-16. Write Markdown and JSON artifacts.
+16. Write the Markdown report.
 17. Return the result for human review.
 
 ### Exit Criteria
@@ -1710,9 +1702,12 @@ Phase 9 is complete when:
 - Recoverable failures use bounded correction paths.
 - Unrecoverable failures produce structured errors.
 - Only validated results proceed to report generation.
-- A complete research request produces Markdown and JSON artifacts.
+- A complete research request produces a validated Markdown report in the
+  approved output directory.
 - The workflow does not execute any financial transaction.
-- Integration tests pass.
+- The product returns the report path and structured workflow status for
+  human review.
+- The bounded product smoke test passes.
 
 ### Dependencies
 
@@ -1728,8 +1723,10 @@ Not Started
 
 ### Goal
 
-Verify that the integrated system satisfies its specifications, handles
-expected failures, and resists adversarial inputs.
+Verify that the complete Phase 9 product satisfies its specifications,
+handles expected failures, and resists adversarial inputs. Phase 10
+confirms and improves the product; it does not introduce the primary
+workflow for the first time.
 
 ### Planned Deliverables
 
@@ -1757,7 +1754,6 @@ Tests will verify that:
 - Candidates are compared.
 - Evidence validation approves a supported result.
 - A Markdown report is written.
-- A JSON workflow artifact is written.
 
 ### Planned Adversarial Coverage
 
@@ -1825,7 +1821,6 @@ prepare the project for evaluation.
 - `COPILOT.md`.
 - Example research report.
 - Example insufficient-evidence report.
-- Structured JSON workflow artifact.
 - Test-results artifact.
 - Final repository review.
 - Submission-ready project repository or archive.
@@ -1945,7 +1940,7 @@ The general dependency order is:
 5. Web research proves external research and scraping capabilities.
 6. Financial analysis adds calculations and candidate comparisons.
 7. Evidence validation verifies research quality and safety.
-8. Report generation produces the required output artifacts.
+8. Report generation produces the required Markdown report.
 9. Workflow integration connects all components.
 10. Quality verification confirms specification compliance.
 11. Submission preparation completes and verifies the deliverable.

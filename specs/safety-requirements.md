@@ -245,7 +245,8 @@ Secret credentials shall not be written to logs.
 
 ### SR-073: No Secret Reporting
 
-Secret credentials shall not be included in Markdown or JSON reports.
+Secret credentials shall not be included in Markdown reports or structured
+workflow data.
 
 ### SR-074: No Secret Test Fixtures
 

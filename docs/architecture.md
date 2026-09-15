@@ -12,12 +12,12 @@ perform predictable operations.
 
 ## Architecture Overview
 
-The system uses:
+The system currently uses:
 
 - A deterministic Python orchestrator.
 - Five specialized AI agents.
 - Deterministic web-research tools.
-- Deterministic financial-calculation tools.
+- One deterministic generic financial-calculation tool.
 - Pydantic data contracts.
 - Deterministic validation and file-writing functions.
 - Human review as the final decision boundary.
@@ -69,7 +69,7 @@ Python components are responsible for:
 - Financial calculations.
 - Identifier validation.
 - Report-structure validation.
-- Markdown and JSON file writing.
+- Markdown file writing.
 - Retry-limit enforcement.
 - Error handling.
 
@@ -122,7 +122,9 @@ extraction remain deterministic operations.
 ### Financial Analysis Agent
 
 The Financial Analysis Agent interprets validated evidence and deterministic
-calculation results.
+generic calculation results. The current slice supports growth, margin,
+ratio, and difference operations rather than a separate calculator for each
+financial metric.
 
 It compares candidates using the approved methodology and produces:
 
@@ -134,9 +136,9 @@ Financial arithmetic is performed by deterministic calculation tools.
 ### Evidence Validation Agent
 
 The Evidence Validation Agent independently determines whether the
-preliminary conclusion is:
+preliminary conclusion and its claims are:
 
-- Traceable.
+- Traceable to source evidence or deterministic calculations.
 - Evidence-supported.
 - Internally consistent.
 - Responsive to the user request.

@@ -797,6 +797,11 @@ Represents one factual passage or structured value extracted from a source.
 
 # 6. Financial Analysis Contracts
 
+The current Phase 6 implementation uses `CalculatedMetric` as the
+calculation-tool output. `CalculationRecord` remains a broader contract for
+future status-oriented calculation workflows, but Phase 7 claim validation
+must understand the evidence lineage on `CalculatedMetric` records.
+
 ## FinancialInput
 
 ### Purpose
@@ -870,6 +875,48 @@ Preserves one deterministic financial calculation and its source lineage.
 - Evidence Validation Agent.
 - Report Writing Agent.
 - Evidence-Lookup Tool.
+
+## CalculatedMetric
+
+### Purpose
+
+Represents one completed generic calculation accepted by the Phase 6
+financial-calculation tool.
+
+### Fields
+
+- `calculation_id: UUID`
+- `workflow_id: UUID`
+- `operation: CalculationOperation`
+- `metric_name: str`
+- `candidate_names: list[str]`
+- `value: Decimal`
+- `unit: str | None`
+- `currency: str | None`
+- `input_evidence_ids: list[UUID]`
+- `formula: str`
+- `reporting_periods: list[str]`
+- `limitations: list[str]`
+
+### Validation Rules
+
+- Exactly two distinct evidence identifiers are required.
+- Both evidence records shall belong to the same workflow.
+- The operation shall be one of the supported generic operations:
+  growth, margin, ratio, or difference.
+- Candidate names shall be unique within the calculation.
+- The formula, value, units, currency, periods, and input evidence shall be
+  preserved for later claim validation.
+
+### Produced By
+
+- Deterministic financial-calculation tool.
+
+### Consumed By
+
+- Financial Analysis Agent.
+- Evidence Validation Agent.
+- Report Writing Agent after validation.
 
 ## CategoryEvaluation
 
@@ -995,6 +1042,43 @@ Represents the preliminary financial research conclusion.
 ---
 
 # 7. Validation Contracts
+
+## ValidationClaim
+
+### Purpose
+
+Represents one material claim submitted to Phase 7 validation. Claims may
+cite source evidence, deterministic calculations, or both.
+
+### Fields
+
+- `claim_id: UUID`
+- `workflow_id: UUID`
+- `text: str`
+- `candidate_name: str | None`
+- `source_ids: list[UUID]`
+- `evidence_ids: list[UUID]`
+- `calculation_id: UUID | None`
+- `expected_value: Decimal | None`
+- `expected_unit: str | None`
+- `expected_currency: str | None`
+- `expected_reporting_periods: list[str]`
+
+### Validation Rules
+
+- A claim shall reference at least one source, evidence, or calculation.
+- Expected calculation metadata requires a calculation identifier.
+- Source and evidence identifiers shall be unique within the claim.
+- Calculated claims shall be checked against the recorded result and
+  calculation lineage.
+
+### Produced By
+
+- Financial Analysis Agent or report-preparation boundary.
+
+### Consumed By
+
+- Evidence Validation Agent.
 
 ## ValidationFinding
 
@@ -1316,7 +1400,7 @@ ExtractedEvidence
     ↓
 FinancialInput
     ↓
-CalculationRecord
+  CalculatedMetric
     ↓
 CategoryEvaluation
     ↓

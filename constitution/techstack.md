@@ -261,16 +261,16 @@ more clearly using standard Python data structures.
 Important financial calculations will be implemented as regular Python
 functions.
 
-These functions may calculate:
+The current simplified calculation tool supports generic operations:
 
-- Percentage change.
-- Revenue growth.
-- Profit margins.
-- Debt-related ratios.
-- Valuation comparisons.
-- Weighted candidate scores.
-- Risk-adjusted scores.
-- Other metrics defined by the recommendation methodology.
+- Growth or percentage change.
+- Margin.
+- Ratio.
+- Difference.
+
+The metric name and evidence requirements identify the financial measure.
+Named calculator classes, portfolio optimization, and advanced valuation
+are outside the current scope.
 
 Financial calculations must not rely on language model arithmetic.
 
@@ -375,33 +375,12 @@ Markdown is used because it is:
 - Suitable for citations and source links.
 - Portable to other document formats if needed later.
 
-## Structured Output
+## Structured Data
 
-### JSON
-
-JSON will be the primary format for structured research artifacts.
-
-Expected JSON artifacts may include:
-
-- Investor profiles.
-- Research requests.
-- Research plans.
-- Search results.
-- Source records.
-- Extracted evidence.
-- Financial metrics.
-- Analysis results.
-- Validation findings.
-- Recommendation records.
-- Workflow execution summaries.
-
-JSON will support:
-
-- Traceability.
-- Debugging.
-- Testing.
-- Reproducibility.
-- Structured data exchange between components.
+Pydantic models are the primary format for structured data exchanged between
+workflow components. Models may be serialized to JSON internally for prompts,
+tests, and debugging, but JSON workflow files are outside the current
+application output scope.
 
 ## Architecture Documentation
 

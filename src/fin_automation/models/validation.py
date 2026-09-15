@@ -1,6 +1,7 @@
 """Structured contracts for evidence validation outcomes."""
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from pydantic import (
@@ -30,6 +31,85 @@ class ValidationBaseModel(BaseModel):
         str_strip_whitespace=True,
         validate_assignment=True,
     )
+
+
+class ValidationClaim(ValidationBaseModel):
+    """One material claim submitted for evidence validation."""
+
+    claim_id: UUID = Field(default_factory=uuid4)
+    workflow_id: UUID
+    text: str = Field(min_length=1)
+    candidate_name: str | None = None
+    source_ids: list[UUID] = Field(default_factory=list)
+    evidence_ids: list[UUID] = Field(default_factory=list)
+    calculation_id: UUID | None = None
+    expected_value: Decimal | None = None
+    expected_unit: str | None = None
+    expected_currency: str | None = None
+    expected_reporting_periods: list[str] = Field(default_factory=list)
+
+    @field_validator("source_ids", "evidence_ids")
+    @classmethod
+    def validate_unique_identifiers(
+        cls,
+        identifiers: list[UUID],
+    ) -> list[UUID]:
+        """Reject duplicate claim references."""
+
+        if len(identifiers) != len(set(identifiers)):
+            raise ValueError(
+                "Claim identifiers must be unique."
+            )
+
+        return identifiers
+
+    @field_validator("expected_currency")
+    @classmethod
+    def normalize_currency(
+        cls,
+        value: str | None,
+    ) -> str | None:
+        """Normalize an optional expected currency code."""
+
+        if value is None:
+            return None
+
+        normalized = value.upper()
+        if len(normalized) != 3:
+            raise ValueError(
+                "Expected currency must use a three-character code."
+            )
+
+        return normalized
+
+    @model_validator(mode="after")
+    def validate_claim_references(self) -> "ValidationClaim":
+        """Require a traceable source, evidence, or calculation."""
+
+        if not self.source_ids and not self.evidence_ids and not self.calculation_id:
+            raise ValueError(
+                "A validation claim requires source, evidence, or "
+                "calculation references."
+            )
+
+        expected_calculation_fields = (
+            self.expected_value,
+            self.expected_unit,
+            self.expected_currency,
+            self.expected_reporting_periods,
+        )
+
+        if any(field is not None and field != [] for field in expected_calculation_fields) and self.calculation_id is None:
+            raise ValueError(
+                "Expected calculation values require calculation_id."
+            )
+
+        if self.calculation_id is not None and self.expected_value is None:
+            raise ValueError(
+                "A calculation-backed claim requires expected_value."
+            )
+
+        return self
 
 
 class ValidationFinding(ValidationBaseModel):

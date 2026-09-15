@@ -60,11 +60,6 @@ Material calculation results shall retain their input values and units.
 Missing values shall be represented explicitly rather than replaced with
 zero, empty text, or invented values.
 
-### NFR-014: Artifact Consistency
-
-The Markdown report and structured JSON artifacts shall describe the same
-completed workflow result.
-
 ## 3. Security
 
 ### NFR-020: Secret Management
@@ -298,10 +293,6 @@ Application code shall not rely on hard-coded developer-specific paths.
 ### NFR-102: Markdown Portability
 
 Human-readable reports shall use standard Markdown where practical.
-
-### NFR-103: JSON Portability
-
-Structured artifacts shall use valid JSON-compatible data.
 
 ## 12. Observability
 

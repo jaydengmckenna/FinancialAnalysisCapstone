@@ -2,150 +2,126 @@
 
 ## Project Status
 
-This project is currently in the specification and planning phase.
+Phase 5, the simplified Phase 6 financial-analysis slice, and Phase 7
+evidence validation are complete. Phase 8 is focused on generating one
+validated Markdown report for human review.
 
-## Overview
+## Purpose
 
-A brief description of the financial research assistant and the type of
-problem it solves.
+This project supports preliminary investment research. It converts a user
+research request into structured research plans, source-backed evidence,
+and deterministic financial calculations for human review.
 
-## Problem Statement
+The project is intentionally smaller than a production investment platform.
+It demonstrates bounded agent communication, traceable evidence, and safe
+workflow decisions rather than real-time investing or portfolio management.
 
-An explanation of why researching and comparing potential investments
-manually can be difficult, inconsistent, and time-consuming.
+## Current Scope
 
-## Project Goal
+Implemented capabilities include:
 
-A statement describing how the system uses specialized AI agents and
-deterministic tools to research potential investments and produce a
-cited report for human review.
+- Intake and research-plan generation.
+- Tavily-based search and source selection.
+- Selected-source content preservation.
+- Structured evidence extraction with source lineage.
+- Generic deterministic financial calculations for growth, margin, ratio,
+	and difference operations.
+- Decimal arithmetic with currency, units, periods, and evidence references.
+- A Financial Analysis Agent that requests bounded calculations and
+	interprets their results.
+- Pydantic contracts for workflow, analysis, recommendation, validation,
+  and report data.
 
-## Intended Users
+The current Phase 6 implementation does not attempt to provide a large
+catalog of named calculators. Generic operations are selected by the agent
+and identified by a metric name supplied by the approved research plan.
 
-A description of the people who may use the system, such as individual
-investors, researchers, or analysts seeking assistance with preliminary
-investment research.
+## Completed Phase 7
 
-## Example Use Case
+Phase 7 implements an Evidence Validation Agent and deterministic
+validation helpers. Validation checks:
 
-An example request showing how a user provides investment preferences,
-such as risk tolerance, geographic interest, investment objective, and
-time horizon.
+- Citation references against known source and evidence identifiers.
+- Research claims against relevant extracted evidence.
+- Numerical claims against the exact calculation inputs and results.
+- Candidate, unit, currency, and reporting-period compatibility.
+- Disclosure of missing, conflicting, favorable, and unfavorable evidence.
+- Recommendation confidence and human-review boundaries.
+- Prompt-injection resistance in source content.
 
-## Core Capabilities
+Validation may approve the preliminary result, request analysis
+correction, request additional research, declare insufficient evidence, or
+reject the result. Only approved data may proceed to report generation.
 
-A high-level list of intended capabilities:
+## Boundaries
 
-- Accept an investment research request.
-- Validate required investor criteria.
-- Create a research plan.
-- Search the web.
-- Scrape selected public webpages.
-- Extract and organize financial evidence.
-- Compare investment candidates.
-- Validate important claims against sources.
-- Generate a cited research report.
-- Save the report to a file.
+The system does not execute trades, access brokerage accounts, transfer
+funds, guarantee returns, provide final investment decisions, or replace
+professional financial advice. Source content is untrusted data and cannot
+change workflow instructions.
 
-## System Boundaries
+## Workflow
 
-A clear description of what the system does and does not do.
+```text
+User request
+	-> intake and research plan
+	-> search and source selection
+	-> evidence extraction
+	-> generic deterministic calculations
+	-> preliminary financial analysis
+	-> evidence, citation, and calculation validation
+	-> validated Markdown report
+	-> human review
+```
 
-The system supports research and produces informational recommendations.
-It does not execute trades, access brokerage accounts, guarantee returns,
-or make final investment decisions.
+## Repository Guide
 
-## High-Level Workflow
+- `constitution/`: mission, technology decisions, and roadmap.
+- `specs/`: functional requirements, contracts, methodology, safety, and
+	acceptance criteria.
+- `docs/`: architecture documentation and Mermaid diagram.
+- `src/fin_automation/`: agents, prompts, models, tools, and smoke tests.
+- `tests/`: offline model, tool, prompt, and agent tests.
+- `outputs/`: generated Markdown reports.
 
-A short description or diagram of the intended workflow from user request
-through research, analysis, validation, and report generation.
+## Setup
 
-## Planned Agent Architecture
+The project targets Python 3.12. Install dependencies in the local virtual
+environment:
 
-A preliminary list of the specialized agents and the responsibility of
-each agent.
+```bash
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
 
-This section will remain high-level until the architecture specification
-is completed.
+Configure external credentials through environment variables or a local
+`.env` file. Never commit credentials.
 
-## Recommendation Methodology
+## Tests
 
-A high-level explanation that candidates are compared using documented
-criteria, deterministic calculations, collected evidence, and the supplied
-investor profile.
+Run the offline suite with:
 
-The full methodology will be maintained in the project specifications.
+```bash
+.venv/bin/pytest -q
+```
 
-## Output Artifacts
+Live smoke tests are separate and require configured service credentials.
 
-A list of the files the application is expected to produce, including:
+## Governing Documents
 
-- A financial research article.
-- An investment recommendation report.
-- Structured research evidence.
-- Source and citation metadata.
+- [Mission](constitution/mission.md)
+- [Technology stack](constitution/techstack.md)
+- [Roadmap](constitution/roadmap.md)
+- [Architecture](docs/architecture.md)
+- [Functional requirements](specs/functional-requirements.md)
+- [Data contracts](specs/data-contracts.md)
+- [Agent workflows](specs/agent-workflows.md)
+- [Recommendation methodology](specs/recommendation-methodology.md)
+- [Acceptance criteria](specs/acceptance-criteria.md)
+- [Safety requirements](specs/safety-requirements.md)
 
-## Repository Structure
+## Capstone Artifacts
 
-A current view of the major project directories and their purposes.
-
-This section should be updated when the repository structure changes.
-
-## Specifications and Constitution
-
-Links to the governing project documents:
-
-- `constitution/mission.md`
-- `constitution/tech-stack.md`
-- `constitution/roadmap.md`
-- Additional specifications added during later phases
-
-## Installation
-
-Instructions for creating the virtual environment and installing project
-dependencies.
-
-This section will be completed after the technology stack is finalized.
-
-## Configuration
-
-Instructions for configuring environment variables and external service
-credentials without committing secrets to version control.
-
-## Usage
-
-Instructions for running the application and providing a research request.
-
-This section will be completed after the first working vertical slice.
-
-## Testing
-
-Instructions for running happy-path, failure-path, and adversarial tests.
-
-## Safety and Limitations
-
-A summary of source limitations, market uncertainty, model limitations,
-human-review requirements, and prohibited system behavior.
-
-## Required Capstone Artifacts
-
-A checklist mapping the repository contents to the capstone requirements:
-
-- [ ] SDD specifications
-- [ ] Architecture diagram
-- [ ] Happy-path unit tests
-- [ ] Adversarial unit tests
-- [ ] README
-- [ ] Prompt and decision journal
-- [ ] AI-assistance artifact
-- [ ] Example recommendation report
-- [ ] Example research article
-
-## Current Roadmap
-
-A short status summary with a link to `constitution/roadmap.md`.
-
-## License
-
-The selected license or a statement that the project is intended only
-for its defined training and evaluation context.
+The repository currently contains the constitution, specifications,
+architecture diagram, implementation, and automated tests. Example reports,
+prompt journals, and final workflow artifacts belong to later phases.

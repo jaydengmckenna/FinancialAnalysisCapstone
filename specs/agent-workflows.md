@@ -70,7 +70,7 @@ The primary workflow order is:
 10. Evidence validation.
 11. Report writing.
 12. Structural report validation.
-13. Markdown and JSON file writing.
+13. Markdown file writing.
 14. Human review.
 
 ### Routing Outcomes
@@ -392,7 +392,7 @@ The Financial Analysis Agent receives:
 - Validated `ResearchPlan`
 - Validated `SourceRecord` objects
 - Validated `ExtractedEvidence` objects
-- Existing `CalculationRecord` objects, when available
+- Existing `CalculatedMetric` records, when available
 
 Webpages must be retrieved, parsed, and converted into validated source and
 evidence records before financial analysis begins.
@@ -401,12 +401,13 @@ evidence records before financial analysis begins.
 
 The Financial Analysis Agent may use:
 
-- Revenue-Growth Calculator
-- Profit-Margin Calculator
-- Debt-to-Equity Calculator
-- Price-to-Earnings Calculator
-- Weighted-Score Calculator
-- Evidence-Lookup Tool
+- The generic deterministic financial-calculation tool.
+- Evidence lookup support.
+
+The current tool supports growth, margin, ratio, and difference
+operations. The approved metric name and evidence records determine what a
+calculation represents; the project does not require one calculator class
+per financial metric.
 
 Calculation formulas, required inputs, missing-data behavior, and expected
 outputs shall be defined in the recommendation methodology and data
@@ -419,7 +420,7 @@ Financial calculation tools shall:
 - Accept validated inputs.
 - Apply documented deterministic formulas.
 - Preserve relevant units, reporting periods, and evidence references.
-- Return validated `CalculationRecord` objects.
+- Return validated `CalculatedMetric` objects with evidence lineage.
 - Identify missing, invalid, unavailable, or non-applicable inputs.
 - Produce the same output for the same validated input.
 
@@ -635,7 +636,9 @@ The Evidence Validation Agent receives:
 - Validated `ResearchPlan`
 - Validated `SourceRecord` objects
 - Validated `ExtractedEvidence` objects
-- Validated `CalculationRecord` objects
+- Validated `CalculatedMetric` objects
+- Validated `ValidationClaim` objects containing claim text and source or
+  calculation references
 - Validated `CandidateAnalysis` objects
 - Preliminary `RecommendationResult`
 
@@ -700,7 +703,8 @@ approved even when its individual claims are supported.
 
 The Evidence Validation Agent shall verify that material calculations:
 
-- Reference known `CalculationRecord` objects.
+- Reference known `CalculatedMetric` objects or other validated calculation
+  records supplied by the workflow.
 - Use documented formulas.
 - Preserve their input evidence references.
 - Use appropriate candidates, units, currencies, and reporting periods.
@@ -898,7 +902,7 @@ The Report Writing Agent receives:
 - Validated `ResearchPlan`
 - Approved `SourceRecord` objects
 - Approved `ExtractedEvidence` objects
-- Approved `CalculationRecord` objects
+- Approved calculation records, including `CalculatedMetric` objects
 - Approved `CandidateAnalysis` objects
 - Approved `RecommendationResult`
 - Approved `ValidationResult`
@@ -917,9 +921,8 @@ The Report Writing Agent may use:
 
 The Report Writing Agent does not write files directly.
 
-After the report draft passes structural validation, deterministic Python
-functions shall write the Markdown and JSON artifacts to approved output
-locations.
+After the report draft passes structural validation, a deterministic Python
+function shall write the Markdown artifact to the approved output location.
 
 ### Report-Writing Responsibilities
 
@@ -1111,7 +1114,6 @@ After the `ReportDraft` passes structural validation, deterministic file
 writers shall produce:
 
 - Markdown research report.
-- JSON workflow artifact.
 
 ### Report Validation
 

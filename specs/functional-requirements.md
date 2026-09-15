@@ -502,10 +502,14 @@ Each material factual claim shall be supported by:
 - Collected source evidence, or
 - A deterministic calculation based on collected source data.
 
+When a claim uses calculated math, validation shall confirm that the claim
+matches the recorded result, formula, units, currency, reporting periods,
+and input evidence.
+
 ### FR-082: Validate Citation References
 
 Each report citation shall refer to a source record collected during the
-same research workflow.
+same research workflow and shall identify evidence relevant to the claim.
 
 ### FR-083: Reject Unknown Sources
 
@@ -515,7 +519,8 @@ source identifiers.
 ### FR-084: Check Claim Support
 
 The validation process shall confirm that cited evidence is relevant to
-the claim it supports.
+the claim it supports. A citation shall not be treated as valid merely
+because its source identifier is known.
 
 ### FR-085: Detect Unsupported Claims
 
@@ -583,10 +588,6 @@ evidence.
 
 The system shall write the final recommendation report to a predictable
 file location.
-
-### FR-098: Write Structured Artifact
-
-The system shall write selected structured research data to JSON.
 
 ### FR-099: Prevent Invalid Output
 
