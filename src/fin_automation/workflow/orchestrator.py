@@ -108,6 +108,8 @@ class ResearchOrchestrator:
         self.last_source_records: list[SourceRecord] = []
         self.last_evidence_records: list[ExtractedEvidence] = []
         self.last_calculations: list[CalculatedMetric] = []
+        self.last_candidate_analyses: list[CandidateAnalysis] = []
+        self.last_recommendation: RecommendationResult | None = None
         self.last_validation_result: ValidationResult | None = None
         self.last_report_draft: ReportDraft | None = None
         self.last_report_artifact: Any = None
@@ -677,6 +679,13 @@ class ResearchOrchestrator:
             research_plan=research_plan,
             candidate_analyses=candidate_analyses,
         )
+        # Report generation must validate the exact same recommendation
+        # and candidate-analysis records that were just checked here, not
+        # freshly rebuilt look-alikes with new random identifiers. Cache
+        # them so run_report_generation reuses these instances instead of
+        # calling the _default_* builders again.
+        self.last_candidate_analyses = candidate_analyses
+        self.last_recommendation = recommendation
         claims = self._default_validation_claims(
             research_plan=research_plan,
             source_records=source_records,
@@ -715,27 +724,33 @@ class ResearchOrchestrator:
         if intake_result is None:
             raise ValueError("No intake result is available for report generation.")
 
-        candidate_analyses = self._default_candidate_analyses(
-            research_plan=research_plan,
-            evidence_records=evidence_records,
-            calculations=calculations,
-        )
-        recommendation = self._default_recommendation(
-            research_plan=research_plan,
-            candidate_analyses=candidate_analyses,
-        )
+        # Reuse the exact candidate-analysis and recommendation records
+        # that evidence validation just approved. Rebuilding fresh ones
+        # here would produce different random recommendation_id and
+        # analysis_id values than what validation actually checked, which
+        # the report-writing prompt correctly refuses to accept.
+        recommendation = self.last_recommendation
+        candidate_analyses = self.last_candidate_analyses
+        if recommendation is None:
+            raise ValueError(
+                "Report generation requires a completed evidence "
+                "validation pass with a cached recommendation."
+            )
 
-        report_draft = self.report_agent.generate_report(
-            research_request=intake_result.research_request,
-            investor_profile=intake_result.investor_profile,
-            research_scope=intake_result.research_scope,
-            research_plan=research_plan,
-            source_records=source_records,
-            evidence_records=evidence_records,
-            calculations=calculations,
-            candidate_analyses=candidate_analyses,
-            recommendation_result=recommendation,
-            validation_result=validation_result,
+        report_draft = self._run_with_retries(
+            "Report generation",
+            lambda: self.report_agent.generate_report(
+                research_request=intake_result.research_request,
+                investor_profile=intake_result.investor_profile,
+                research_scope=intake_result.research_scope,
+                research_plan=research_plan,
+                source_records=source_records,
+                evidence_records=evidence_records,
+                calculations=calculations,
+                candidate_analyses=candidate_analyses,
+                recommendation_result=recommendation,
+                validation_result=validation_result,
+            ),
         )
         self.last_report_draft = report_draft
         return report_draft

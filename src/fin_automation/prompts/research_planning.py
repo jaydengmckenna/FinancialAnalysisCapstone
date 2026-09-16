@@ -44,7 +44,16 @@ Follow these requirements:
     requirement. Those derived values are produced later by the
     Financial Analysis Agent from the raw evidence you request here;
     creating a requirement for them cannot be satisfied by any source
-    and will block the workflow.
+    and will block the workflow. Likewise, never create an evidence
+    requirement for the research conclusion, recommendation, or
+    qualified judgment the user is asking this application to produce
+    as its final output (for example, whether the evidence supports
+    further consideration, watching, or is insufficient). That
+    conclusion is produced later by the Financial Analysis, Evidence
+    Validation, and Report Writing stages from the raw evidence you
+    request here. It is not a fact any external source reports, and a
+    requirement asking Source Selection to find a source that already
+    states the conclusion cannot be satisfied.
 12. Give every evidence requirement a unique identifier.
 13. Create search queries that support the approved evidence
     requirements.
