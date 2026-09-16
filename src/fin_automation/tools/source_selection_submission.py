@@ -3,7 +3,7 @@
 from collections.abc import Mapping
 from uuid import UUID
 
-from pydantic import ValidationError
+from pydantic import AnyHttpUrl, ValidationError
 from smolagents import Tool
 
 from fin_automation.models.sources import (
@@ -267,10 +267,12 @@ class SubmitSourceSelectionTool(Tool):
                     "search."
                 )
 
+            validated_url = AnyHttpUrl(str(search_result.url))
+
             hydrated_selection.update(
                 {
                     "title": search_result.title,
-                    "url": str(search_result.url),
+                    "url": validated_url,
                     "domain": search_result.domain,
                     "raw_content": (
                         search_result.raw_content

@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     openai_base_url: AnyHttpUrl = Field(alias="OPENAI_BASE_URL")
     tavily_api_key: SecretStr = Field(alias="TAVILY_API_KEY")
     model_id: str = Field(alias="MODEL_ID")
+    output_directory: Path = Field(
+        default=PROJECT_ROOT / "outputs",
+        alias="OUTPUT_DIRECTORY",
+    )
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

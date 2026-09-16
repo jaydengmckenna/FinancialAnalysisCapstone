@@ -60,16 +60,18 @@ The roadmap uses the following statuses:
 | Phase 5: Web Research Vertical Slice | Completed |
 | Phase 6: Simplified Financial Analysis Slice | Completed |
 | Phase 7: Evidence Validation and Safety | Completed |
-| Phase 8: Markdown Report Generation | In Progress |
-| Phase 9: Complete Product Workflow | Not Started |
+| Phase 8: Markdown Report Generation | Completed |
+| Phase 9: Complete Product Workflow | In Progress |
 | Phase 10: Testing and Quality Verification | Not Started |
 | Phase 11: Documentation and Submission Preparation | Not Started |
 
 ## Current Focus
 
-The project is preparing Phase 8: Markdown Report Generation. Phase 7
-is implemented and tested with deterministic claim, citation, calculation,
-safety, and correction-routing validation.
+The project has completed Phase 8: Markdown Report Generation and is now
+advancing Phase 9: Complete Product Workflow. The current product scope
+remains focused on a human-readable Markdown report for review by the
+investor or analyst, with deterministic validation and safety controls
+applied before the report is written.
 
 ---
 
@@ -1578,7 +1580,7 @@ Phase 7 depends on completion of Phases 5 and 6.
 
 ### Status
 
-In Progress
+Completed
 
 ### Goal
 
@@ -1644,15 +1646,16 @@ Phase 8 depends on completion of Phase 7.
 
 ### Status
 
-Not Started
+In Progress
 
 ### Goal
 
-Connect all agents, deterministic tools, Pydantic contracts, validation
-gates, correction paths, and Markdown report output into one complete,
-usable research product. At the end of Phase 9, a user should be able to
-submit a research request and receive a validated Markdown report for human
-review. Broader quality verification belongs to Phase 10.
+Connect the completed research, validation, and Markdown-output components
+into one end-to-end product workflow. Phase 9 focuses on orchestration,
+stage-to-stage handoff, bounded correction behavior, and final report
+handoff while staying within the project scope of a human-readable
+Markdown report for review rather than a machine-consumed JSON artifact
+workflow. Broader quality verification belongs to Phase 10.
 
 ### Planned Deliverables
 

@@ -4,6 +4,7 @@ import json
 from typing import Final
 
 from fin_automation.models.research import ResearchPlan
+from fin_automation.models.research import AdditionalResearchRequest
 from fin_automation.models.sources import SourceSelection
 
 
@@ -118,6 +119,7 @@ Follow these requirements:
 
 def build_source_selection_messages(
     research_plan: ResearchPlan,
+    additional_research_requests: list[AdditionalResearchRequest] | None = None,
 ) -> list[dict[str, str]]:
     """Build messages for source search and selection.
 
@@ -157,6 +159,10 @@ def build_source_selection_messages(
         "research_plan": research_plan.model_dump(
             mode="json"
         ),
+        "additional_research_requests": [
+            request.model_dump(mode="json")
+            for request in (additional_research_requests or [])
+        ],
         "source_selection_schema": (
             SourceSelection.model_json_schema()
         ),

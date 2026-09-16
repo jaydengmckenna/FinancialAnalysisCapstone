@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Mapping
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ValidationError
 from smolagents import Model, ToolCallingAgent
@@ -36,6 +36,8 @@ class ResearchPlanner(ToolCallingAgent):
             model_to_use: A smolagents-compatible model instance.
         """
 
+        self.last_intake_result: IntakeResult | None = None
+
         super().__init__(
             tools=[],
             model=model_to_use,
@@ -52,6 +54,7 @@ class ResearchPlanner(ToolCallingAgent):
         self,
         original_prompt: str,
         workflow_id: UUID,
+        clarification_context: list[tuple[str, str]] | None = None,
     ) -> IntakeResult:
         """Interpret a user prompt as a validated IntakeResult.
 
@@ -59,6 +62,8 @@ class ResearchPlanner(ToolCallingAgent):
             original_prompt: The user's original financial-research
                 request.
             workflow_id: UUID identifying the current workflow.
+            clarification_context: Optional clarification answers for
+                the same request.
 
         Returns:
             A validated IntakeResult.
@@ -72,6 +77,7 @@ class ResearchPlanner(ToolCallingAgent):
         messages = build_intake_messages(
             original_prompt=original_prompt,
             workflow_id=workflow_id,
+            clarification_context=clarification_context,
         )
 
         task = messages[1]["content"]
@@ -82,25 +88,164 @@ class ResearchPlanner(ToolCallingAgent):
         )
 
         intake_result = self._parse_intake_result(
-            raw_result
+            raw_result,
+            original_prompt=original_prompt,
         )
 
         self._validate_intake_identity(
             intake_result=intake_result,
-            original_prompt=original_prompt,
             workflow_id=workflow_id,
         )
+
+        self.last_intake_result = intake_result
 
         return intake_result
 
     @staticmethod
+    def _normalize_intake_payload(parsed_json: object) -> object:
+        """Normalize malformed but recoverable intake payloads."""
+
+        if not isinstance(parsed_json, dict):
+            return parsed_json
+
+        top_level_prompt = parsed_json.get("original_prompt")
+        nested_request = parsed_json.get("research_request")
+
+        if isinstance(top_level_prompt, str) and isinstance(nested_request, dict):
+            nested_request["original_prompt"] = top_level_prompt
+            nested_request["workflow_id"] = nested_request.get(
+                "workflow_id",
+                parsed_json.get("workflow_id"),
+            )
+            parsed_json["research_request"] = nested_request
+
+        if isinstance(top_level_prompt, str) and "research_request" not in parsed_json:
+            flattened_prompt = top_level_prompt
+            if isinstance(parsed_json.get("research_question"), str):
+                research_request = {
+                    "workflow_id": parsed_json.get("workflow_id"),
+                    "original_prompt": flattened_prompt,
+                    "research_question": parsed_json.get("research_question"),
+                    "request_type": parsed_json.get("request_type"),
+                }
+                parsed_json = {
+                    "workflow_id": parsed_json.get("workflow_id"),
+                    "research_request": research_request,
+                    "investor_profile": parsed_json.get("investor_profile", {}),
+                    "research_scope": parsed_json.get("research_scope", {}),
+                    "assumptions": parsed_json.get("assumptions", []),
+                    "missing_fields": parsed_json.get("missing_fields", []),
+                    "requires_clarification": parsed_json.get(
+                        "requires_clarification",
+                        False,
+                    ),
+                    "clarification_questions": parsed_json.get(
+                        "clarification_questions",
+                        [],
+                    ),
+                    "created_at": parsed_json.get("created_at"),
+                }
+
+        for nested_key in ("research_request", "investor_profile", "research_scope"):
+            nested = parsed_json.get(nested_key)
+            if not isinstance(nested, dict):
+                continue
+
+            for extra_key in (
+                "request_id",
+                "profile_id",
+                "scope_id",
+                "requires_clarification",
+            ):
+                if extra_key in nested and (
+                    extra_key == "requires_clarification"
+                    or not str(nested[extra_key]).strip()
+                    or not isinstance(nested[extra_key], str)
+                ):
+                    nested.pop(extra_key, None)
+
+            if "workflow_id" not in nested or not str(nested["workflow_id"]).strip():
+                nested["workflow_id"] = parsed_json.get("workflow_id")
+
+        investor_profile = parsed_json.get("investor_profile")
+        if isinstance(investor_profile, dict):
+            required_profile_fields = (
+                "risk_tolerance",
+                "investment_objective",
+                "time_horizon",
+            )
+            missing_fields = [
+                field_name
+                for field_name in required_profile_fields
+                if investor_profile.get(field_name) is None
+            ]
+            parsed_json["missing_fields"] = missing_fields
+            parsed_json["requires_clarification"] = bool(missing_fields)
+            if missing_fields:
+                existing_questions = parsed_json.get(
+                    "clarification_questions"
+                )
+                if not isinstance(existing_questions, list) or not existing_questions:
+                    parsed_json["clarification_questions"] = [
+                        f"What is your {field_name.replace('_', ' ')}?"
+                        for field_name in missing_fields
+                    ]
+            else:
+                parsed_json["clarification_questions"] = []
+
+        parsed_json.pop("original_prompt", None)
+        parsed_json.pop("research_question", None)
+        parsed_json.pop("request_type", None)
+
+        return parsed_json
+
+    @staticmethod
+    def _force_original_prompt(
+        parsed_json: object,
+        original_prompt: str,
+    ) -> object:
+        """Overwrite the echoed prompt with the caller's exact string.
+
+        The model is asked to repeat the original prompt back so it has
+        the request in context, but language models routinely
+        "clean up" whitespace, smart quotes, or stray control
+        characters when they do this. Treating that echoed copy as
+        authoritative made the whole workflow crash on cosmetic
+        differences. Python owns `original_prompt`, so it overwrites
+        whatever the model produced instead of trusting a literal
+        match.
+
+        Args:
+            parsed_json: Normalized intake payload.
+            original_prompt: The exact string supplied by the caller.
+
+        Returns:
+            The payload with `research_request.original_prompt` forced
+            to the caller-supplied value.
+        """
+
+        if not isinstance(parsed_json, dict):
+            return parsed_json
+
+        research_request = parsed_json.get("research_request")
+        if isinstance(research_request, dict):
+            research_request["original_prompt"] = original_prompt
+
+        return parsed_json
+
+    @staticmethod
     def _parse_intake_result(
         raw_result: object,
+        original_prompt: str,
     ) -> IntakeResult:
         """Convert the agent's final answer into IntakeResult.
 
         Args:
             raw_result: Final value returned by the smolagents agent.
+            original_prompt: The exact request string supplied by the
+                caller. Forced into the parsed result so cosmetic
+                differences in the model's echoed copy cannot fail
+                validation.
 
         Returns:
             A validated IntakeResult.
@@ -111,7 +256,13 @@ class ResearchPlanner(ToolCallingAgent):
         """
 
         if isinstance(raw_result, IntakeResult):
-            return raw_result
+            return raw_result.model_copy(
+                update={
+                    "research_request": raw_result.research_request.model_copy(
+                        update={"original_prompt": original_prompt}
+                    )
+                }
+            )
 
         if isinstance(raw_result, BaseModel):
             raw_result = raw_result.model_dump(
@@ -119,10 +270,12 @@ class ResearchPlanner(ToolCallingAgent):
             )
 
         if isinstance(raw_result, Mapping):
+            normalized = ResearchPlanner._normalize_intake_payload(dict(raw_result))
+            normalized = ResearchPlanner._force_original_prompt(
+                normalized, original_prompt
+            )
             try:
-                return IntakeResult.model_validate(
-                    dict(raw_result)
-                )
+                return IntakeResult.model_validate(normalized)
             except ValidationError as error:
                 raise ValueError(
                     "The agent returned an invalid intake result."
@@ -147,6 +300,11 @@ class ResearchPlanner(ToolCallingAgent):
             raise ValueError(
                 "The agent did not return valid JSON."
             ) from error
+
+        parsed_json = ResearchPlanner._normalize_intake_payload(parsed_json)
+        parsed_json = ResearchPlanner._force_original_prompt(
+            parsed_json, original_prompt
+        )
 
         try:
             return IntakeResult.model_validate(
@@ -200,18 +358,19 @@ class ResearchPlanner(ToolCallingAgent):
     @staticmethod
     def _validate_intake_identity(
         intake_result: IntakeResult,
-        original_prompt: str,
         workflow_id: UUID,
     ) -> None:
         """Validate the result against its originating request.
 
         Pydantic validates the internal IntakeResult structure. These
         checks verify that the model result belongs to the requested
-        workflow and preserves the original prompt.
+        workflow. The original prompt itself is no longer checked here
+        for an exact match: `_force_original_prompt` already makes
+        Python the source of truth for that value before validation,
+        so the request is always the caller's exact string.
 
         Args:
             intake_result: Validated intake returned by the agent.
-            original_prompt: Original request supplied by the caller.
             workflow_id: Workflow identifier supplied by the caller.
 
         Raises:
@@ -252,14 +411,6 @@ class ResearchPlanner(ToolCallingAgent):
                 "requested workflow."
             )
 
-        if (
-            intake_result.research_request.original_prompt
-            != original_prompt
-        ):
-            raise ValueError(
-                "The intake result did not preserve the original "
-                "prompt exactly."
-        )
     @staticmethod
     def ensure_ready_for_planning(
         intake_result: IntakeResult,
@@ -287,22 +438,31 @@ class ResearchPlanner(ToolCallingAgent):
                 intake_result.clarification_questions
             ),
         )
-    def interpret_and_validate_intake(self, original_prompt: str, workflow_id: UUID,) -> IntakeResult:
+
+    def interpret_and_validate_intake(
+        self,
+        original_prompt: str,
+        workflow_id: UUID,
+        clarification_context: list[tuple[str, str]] | None = None,
+    ) -> IntakeResult:
         """Interpret intake and enforce the clarification gate.
 
         Args:
             original_prompt: The user's financial research request.
             workflow_id: Identifier for current workflow.
-            
+            clarification_context: Optional clarification answers for
+                the same request.
+
         Returns:
             a complete IntakeResult that may proceed to research planning.
-        
+
         Raises:
             ClarificationRequiredError: if required intake information is missing.
         """
         intake_res = self.interpret_intake(
             original_prompt=original_prompt,
             workflow_id=workflow_id,
+            clarification_context=clarification_context,
         )
         self.ensure_ready_for_planning(
             intake_result=intake_res,
@@ -382,9 +542,12 @@ class ResearchPlanner(ToolCallingAgent):
             )
 
         if isinstance(raw_result, Mapping):
+            normalized = ResearchPlanner._normalize_research_plan_payload(
+                dict(raw_result)
+            )
             try:
                 return ResearchPlan.model_validate(
-                    dict(raw_result)
+                    normalized
                 )
             except ValidationError as error:
                 raise ValueError(
@@ -411,6 +574,10 @@ class ResearchPlanner(ToolCallingAgent):
                 "The agent did not return valid research-plan JSON."
             ) from error
 
+        parsed_json = ResearchPlanner._normalize_research_plan_payload(
+            parsed_json
+        )
+
         try:
             return ResearchPlan.model_validate(
                 parsed_json
@@ -420,6 +587,71 @@ class ResearchPlanner(ToolCallingAgent):
                 "The agent returned JSON that does not satisfy "
                 "the ResearchPlan contract."
             ) from error
+
+    @staticmethod
+    def _normalize_research_plan_payload(
+        payload: dict[str, object],
+    ) -> dict[str, object]:
+        """Repair malformed model-generated UUIDs and their references."""
+
+        normalized = dict(payload)
+
+        def valid_uuid(value: object) -> bool:
+            try:
+                UUID(str(value))
+            except (TypeError, ValueError):
+                return False
+            return True
+
+        if not valid_uuid(normalized.get("plan_id")):
+            normalized["plan_id"] = str(uuid4())
+
+        raw_requirements = normalized.get("evidence_requirements", [])
+        requirement_id_map: dict[str, str] = {}
+        requirements: list[dict[str, object]] = []
+        if isinstance(raw_requirements, list):
+            for raw_requirement in raw_requirements:
+                if not isinstance(raw_requirement, Mapping):
+                    continue
+                requirement = dict(raw_requirement)
+                raw_id = requirement.get("requirement_id")
+                requirement_id = (
+                    str(raw_id)
+                    if valid_uuid(raw_id)
+                    else str(uuid4())
+                )
+                if raw_id is not None:
+                    requirement_id_map[str(raw_id)] = requirement_id
+                requirement["requirement_id"] = requirement_id
+                requirements.append(requirement)
+        normalized["evidence_requirements"] = requirements
+
+        raw_queries = normalized.get("search_queries", [])
+        queries: list[dict[str, object]] = []
+        if isinstance(raw_queries, list):
+            for raw_query in raw_queries:
+                if not isinstance(raw_query, Mapping):
+                    continue
+                query = dict(raw_query)
+                if not valid_uuid(query.get("query_id")):
+                    query["query_id"] = str(uuid4())
+
+                raw_reference_ids = query.get(
+                    "evidence_requirement_ids",
+                    [],
+                )
+                if isinstance(raw_reference_ids, list):
+                    query["evidence_requirement_ids"] = [
+                        requirement_id_map.get(
+                            str(reference_id),
+                            str(reference_id),
+                        )
+                        for reference_id in raw_reference_ids
+                    ]
+                queries.append(query)
+        normalized["search_queries"] = queries
+
+        return normalized
 
     @staticmethod
     def _validate_research_plan_identity(
@@ -521,7 +753,12 @@ class ResearchPlanner(ToolCallingAgent):
                 "per candidate."
             )
 
-    def interpret_and_plan(self, original_prompt: str, workflow_id: UUID,) -> IntakeResult | ResearchPlan:
+    def interpret_and_plan(
+        self,
+        original_prompt: str,
+        workflow_id: UUID,
+        clarification_context: list[tuple[str, str]] | None = None,
+    ) -> IntakeResult | ResearchPlan:
         """Interpret intake and create a plan when intake is complete.
 
         Args:
@@ -533,7 +770,11 @@ class ResearchPlanner(ToolCallingAgent):
         a completed ResearchPlan.
         """
 
-        intake_result = self.interpret_intake(original_prompt=original_prompt, workflow_id=workflow_id)
+        intake_result = self.interpret_intake(
+            original_prompt=original_prompt,
+            workflow_id=workflow_id,
+            clarification_context=clarification_context,
+        )
 
         if intake_result.requires_clarification:
             return intake_result

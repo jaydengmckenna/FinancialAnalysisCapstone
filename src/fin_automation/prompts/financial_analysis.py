@@ -69,15 +69,28 @@ def build_financial_analysis_task(
         )
 
     evidence_payload = [
-        record.model_dump(mode="json")
+        {
+            "evidence_id": str(record.evidence_id),
+            "candidate_name": record.candidate_name,
+            "evidence_type": record.evidence_type,
+            "reported_value": (
+                str(record.reported_value)
+                if record.reported_value is not None
+                else None
+            ),
+            "currency": record.currency,
+            "unit": record.unit,
+            "reporting_period": record.reporting_period,
+            "content": record.content,
+        }
         for record in evidence
     ]
 
     return (
         "Analyze the validated extracted evidence below.\n\n"
         "Select one supported and meaningful calculation when the "
-        "evidence permits it. Use the exact evidence_id values in the "
-        "tool call.\n\n"
+        "evidence permits it. In every tool call, copy the exact value "
+        "from the evidence_id field; do not use any other identifier.\n\n"
         "If no supported calculation can be completed, explain the "
         "specific limitation without inventing missing information.\n\n"
         "VALIDATED_EXTRACTED_EVIDENCE:\n"

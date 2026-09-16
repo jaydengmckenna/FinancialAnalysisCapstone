@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 
 from smolagents import Tool
+from fin_automation.config import get_settings
 from fin_automation.models.common import ArtifactStatus, ArtifactType
 from fin_automation.models.reports import (
     ReportArtifact,
@@ -35,12 +36,31 @@ class ReportWriterTool(Tool):
     }
     output_type = "object"
 
+    def __init__(self, output_directory: Path | None = None) -> None:
+        """Initialize the tool with the approved output directory.
+
+        Args:
+            output_directory: Directory to write reports into. Defaults
+                to the configured, project-root-anchored `outputs`
+                directory (`Settings.output_directory`) rather than a
+                path relative to whatever the current working
+                directory happens to be.
+        """
+
+        super().__init__()
+
+        self._output_directory = (
+            output_directory
+            if output_directory is not None
+            else get_settings().output_directory
+        )
+
     def forward(self, report_content: ReportDraft) -> ReportArtifact:
         """Write the report to Markdown file."""
 
         self._report_structure_validation(report_content)
 
-        output_directory = Path("output")
+        output_directory = self._output_directory
         output_directory.mkdir(parents=True, exist_ok=True)
         file_path = self._next_available_path(output_directory)
 
@@ -59,7 +79,7 @@ class ReportWriterTool(Tool):
             artifact_type=ArtifactType.MARKDOWN_REPORT,
             status=ArtifactStatus.CREATED,
             file_name=file_path.name,
-            relative_path=file_path.as_posix(),
+            relative_path=f"{output_directory.name}/{file_path.name}",
             checksum_sha256=checksum,
             created_at=datetime.now(timezone.utc),
         )

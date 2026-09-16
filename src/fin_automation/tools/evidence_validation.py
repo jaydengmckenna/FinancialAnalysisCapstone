@@ -293,6 +293,13 @@ class EvidenceValidationService:
                         evidence_by_id=evidence_by_id,
                         findings=findings,
                     )
+                    self._check_comparable_periods(
+                        workflow_id=workflow_id,
+                        claim=claim,
+                        calculation=calculation,
+                        evidence_by_id=evidence_by_id,
+                        findings=findings,
+                    )
 
             unsafe_text = claim.text.casefold()
             if any(phrase in unsafe_text for phrase in _UNSAFE_PHRASES):
@@ -352,6 +359,78 @@ class EvidenceValidationService:
                     target=CorrectionTarget.FINANCIAL_ANALYSIS,
                 )
             )
+
+    @staticmethod
+    def _check_comparable_periods(
+        *,
+        workflow_id: UUID,
+        claim: ValidationClaim,
+        calculation: CalculatedMetric,
+        evidence_by_id: dict[UUID, object],
+        findings: list[ValidationFinding],
+    ) -> None:
+        """Reject calculations that compare different period granularities."""
+
+        if calculation.operation.value != "growth_rate":
+            return
+
+        periods = [
+            str(getattr(evidence_by_id[evidence_id], "reporting_period", ""))
+            for evidence_id in calculation.input_evidence_ids
+            if evidence_id in evidence_by_id
+        ]
+        if len(periods) != 2:
+            return
+
+        def granularity(period: str) -> str:
+            normalized = period.upper().strip()
+            if normalized.startswith("Q") or " Q" in normalized:
+                return "quarter"
+            if (
+                normalized.startswith("FY")
+                # Catches "FISCAL 2024" and "FISCAL YEAR 2024" alike;
+                # requiring the literal phrase "FISCAL YEAR" missed the
+                # very common "Fiscal 2024" form used by some sources,
+                # which fell through to "other" and was then flagged
+                # as incompatible with an "FY2024"-labeled figure for
+                # the exact same period.
+                or "FISCAL" in normalized
+                or "ANNUAL" in normalized
+                # A bare four-digit year (e.g. "2023") is also an
+                # annual period. Sources routinely label the same
+                # fiscal year one way ("FY2024") and the other
+                # ("2024"); without this, every such pairing was
+                # misclassified as an incompatible comparison even
+                # though both values cover a full year.
+                or re.fullmatch(r"(?:19|20)\d{2}", normalized)
+            ):
+                return "annual"
+            return "other"
+
+        granularities = {granularity(period) for period in periods}
+        if len(granularities) <= 1:
+            return
+
+        findings.append(
+            EvidenceValidationService._finding(
+                workflow_id=workflow_id,
+                category=ValidationCategory.INCOMPATIBLE_COMPARISON,
+                severity=ValidationSeverity.BLOCKING,
+                candidate_name=claim.candidate_name,
+                affected_claim=claim.text,
+                affected_calculation_id=calculation.calculation_id,
+                evidence_ids=list(calculation.input_evidence_ids),
+                description=(
+                    "The calculation compares reporting periods with "
+                    "different granularities: " + ", ".join(periods) + "."
+                ),
+                correction=(
+                    "Retrieve matching periods, such as FY2024 and FY2023 "
+                    "or Q3 2024 and Q3 2023."
+                ),
+                target=CorrectionTarget.SOURCE_SELECTION,
+            )
+        )
 
     def _check_recommendation(
         self,

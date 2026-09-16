@@ -2,10 +2,11 @@
 
 import json
 from collections.abc import Mapping
+from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
-from pydantic import ValidationError
+from pydantic import AnyHttpUrl, ValidationError
 from smolagents import Tool
 from tavily import TavilyClient
 
@@ -52,7 +53,8 @@ class TavilySearchTool(Tool):
         "search_depth": {
             "type": "string",
             "description": (
-                "Tavily search depth. Must be basic or advanced."
+                "Tavily search depth. Must be basic, advanced, fast, or "
+                "ultra-fast."
             ),
         },
         "max_results": {
@@ -128,7 +130,7 @@ class TavilySearchTool(Tool):
         query: str,
         workflow_id: str,
         query_id: str,
-        search_depth: str,
+        search_depth: Literal["basic", "advanced", "fast", "ultra-fast"],
         max_results: int,
     ) -> str:
         """Execute one approved Tavily search query.
@@ -137,7 +139,8 @@ class TavilySearchTool(Tool):
             query: Exact query text from the approved SearchQuery.
             workflow_id: Workflow UUID from the ResearchPlan.
             query_id: UUID of the approved SearchQuery.
-            search_depth: Tavily depth, either basic or advanced.
+            search_depth: Tavily depth, one of basic, advanced, fast, or
+                ultra-fast.
             max_results: Maximum number of results from one through five.
 
         Returns:
@@ -158,9 +161,11 @@ class TavilySearchTool(Tool):
         if search_depth not in {
             "basic",
             "advanced",
+            "fast",
+            "ultra-fast",
         }:
             raise ValueError(
-                "search_depth must be basic or advanced."
+                "search_depth must be basic, advanced, fast, or ultra-fast."
             )
 
         if not 1 <= max_results <= 5:
@@ -339,17 +344,18 @@ class TavilySearchTool(Tool):
                     )
 
             try:
+                validated_url: AnyHttpUrl = AnyHttpUrl(normalized_url)
                 search_result = SearchResult(
                     workflow_id=workflow_id,
                     query_id=query_id,
                     title=normalized_title,
-                    url=normalized_url,
+                    url=validated_url,
                     snippet=snippet,
                     raw_content=validated_raw_content,
                     domain=domain,
                     result_position=position,
                 )
-            except ValidationError:
+            except (ValidationError, ValueError):
                 continue
 
             search_results.append(

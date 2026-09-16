@@ -6,6 +6,7 @@ from fin_automation.models.common import (
     SourceSelectionStatus,
 )
 from fin_automation.models.research import (
+    AdditionalResearchRequest,
     ResearchPlan,
 )
 from fin_automation.models.sources import (
@@ -70,6 +71,7 @@ class SourceSelectionAgent(ToolCallingAgent):
     def search_and_select(
         self,
         research_plan: ResearchPlan,
+        additional_research_requests: list[AdditionalResearchRequest] | None = None,
     ) -> SourceSelection:
         """Execute approved searches and select relevant sources.
 
@@ -91,6 +93,7 @@ class SourceSelectionAgent(ToolCallingAgent):
 
         messages = build_source_selection_messages(
             research_plan=research_plan,
+            additional_research_requests=additional_research_requests,
         )
 
         task = messages[1]["content"]

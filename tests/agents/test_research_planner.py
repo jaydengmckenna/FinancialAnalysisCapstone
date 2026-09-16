@@ -122,17 +122,18 @@ def create_uninitialized_planner(
 
 
 def test_parse_intake_result_accepts_existing_model() -> None:
-    """An existing IntakeResult should be returned unchanged."""
+    """An existing IntakeResult should be returned with the same prompt."""
 
     expected_result = create_complete_intake_result(
         workflow_id=uuid4()
     )
 
     parsed_result = ResearchPlanner._parse_intake_result(
-        expected_result
+        expected_result,
+        original_prompt=expected_result.research_request.original_prompt,
     )
 
-    assert parsed_result is expected_result
+    assert parsed_result == expected_result
 
 
 def test_parse_intake_result_accepts_dictionary() -> None:
@@ -147,7 +148,8 @@ def test_parse_intake_result_accepts_dictionary() -> None:
     )
 
     parsed_result = ResearchPlanner._parse_intake_result(
-        raw_result
+        raw_result,
+        original_prompt=expected_result.research_request.original_prompt,
     )
 
     assert parsed_result == expected_result
@@ -163,7 +165,8 @@ def test_parse_intake_result_accepts_json_string() -> None:
     raw_result = expected_result.model_dump_json()
 
     parsed_result = ResearchPlanner._parse_intake_result(
-        raw_result
+        raw_result,
+        original_prompt=expected_result.research_request.original_prompt,
     )
 
     assert parsed_result == expected_result
@@ -183,7 +186,8 @@ def test_parse_intake_result_accepts_json_code_fence() -> None:
     )
 
     parsed_result = ResearchPlanner._parse_intake_result(
-        raw_result
+        raw_result,
+        original_prompt=expected_result.research_request.original_prompt,
     )
 
     assert parsed_result == expected_result
@@ -196,7 +200,10 @@ def test_parse_intake_result_rejects_empty_result() -> None:
         ValueError,
         match="returned an empty intake result",
     ):
-        ResearchPlanner._parse_intake_result("   ")
+        ResearchPlanner._parse_intake_result(
+            "   ",
+            original_prompt="Original prompt.",
+        )
 
 
 def test_parse_intake_result_rejects_invalid_json() -> None:
@@ -207,7 +214,8 @@ def test_parse_intake_result_rejects_invalid_json() -> None:
         match="did not return valid JSON",
     ):
         ResearchPlanner._parse_intake_result(
-            "This is not a JSON object."
+            "This is not a JSON object.",
+            original_prompt="Original prompt.",
         )
 
 
@@ -227,7 +235,10 @@ def test_parse_intake_result_rejects_invalid_contract() -> None:
             "does not satisfy the IntakeResult contract"
         ),
     ):
-        ResearchPlanner._parse_intake_result(raw_result)
+        ResearchPlanner._parse_intake_result(
+            raw_result,
+            original_prompt="Original prompt.",
+        )
 
 
 def test_remove_markdown_code_fence_accepts_plain_json() -> None:
@@ -263,21 +274,16 @@ def test_remove_markdown_code_fence_removes_json_fence() -> None:
 
 
 def test_validate_intake_identity_accepts_matching_result() -> None:
-    """Matching prompt and workflow identity should pass."""
+    """A result from the requested workflow should pass."""
 
     workflow_id = uuid4()
-    original_prompt = (
-        "Compare three international stocks for long-term growth."
-    )
 
     intake_result = create_complete_intake_result(
         workflow_id=workflow_id,
-        original_prompt=original_prompt,
     )
 
     ResearchPlanner._validate_intake_identity(
         intake_result=intake_result,
-        original_prompt=original_prompt,
         workflow_id=workflow_id,
     )
 
@@ -299,35 +305,7 @@ def test_validate_intake_identity_rejects_workflow_mismatch() -> None:
     ):
         ResearchPlanner._validate_intake_identity(
             intake_result=intake_result,
-            original_prompt=(
-                intake_result
-                .research_request
-                .original_prompt
-            ),
             workflow_id=requested_workflow_id,
-        )
-
-
-def test_validate_intake_identity_rejects_modified_prompt() -> None:
-    """The model must preserve the original request exactly."""
-
-    workflow_id = uuid4()
-
-    intake_result = create_complete_intake_result(
-        workflow_id=workflow_id,
-        original_prompt="Modified prompt.",
-    )
-
-    with pytest.raises(
-        ValueError,
-        match=(
-            "did not preserve the original prompt exactly"
-        ),
-    ):
-        ResearchPlanner._validate_intake_identity(
-            intake_result=intake_result,
-            original_prompt="Original prompt.",
-            workflow_id=workflow_id,
         )
 
 
@@ -354,6 +332,82 @@ def test_interpret_intake_returns_validated_result() -> None:
     )
 
     assert result == expected_result
+
+
+def test_interpret_intake_accepts_flattened_original_prompt() -> None:
+    """The parser should normalize a model response that repeats original_prompt at the top level."""
+
+    workflow_id = uuid4()
+    original_prompt = "Give me a stock for long-term growth."
+
+    expected_result = create_complete_intake_result(
+        workflow_id=workflow_id,
+        original_prompt=original_prompt,
+    )
+
+    flattened_payload = expected_result.model_dump(mode="json")
+    flattened_payload["original_prompt"] = original_prompt
+
+    planner = create_uninitialized_planner(
+        raw_result=json.dumps(flattened_payload)
+    )
+
+    result = planner.interpret_intake(
+        original_prompt=original_prompt,
+        workflow_id=workflow_id,
+    )
+
+    assert result == expected_result
+
+
+def test_interpret_intake_accepts_malformed_nested_ids_and_flags() -> None:
+    """The parser should drop malformed nested IDs and extra clarification flags from model output."""
+
+    workflow_id = uuid4()
+    original_prompt = "Analyze NVIDIA for long-term growth."
+
+    malformed_payload = {
+        "workflow_id": str(workflow_id),
+        "research_request": {
+            "workflow_id": str(workflow_id),
+            "original_prompt": original_prompt,
+            "research_question": "Should NVIDIA be researched for long-term growth?",
+            "request_type": "single_candidate_analysis",
+            "request_id": "",
+        },
+        "investor_profile": {
+            "workflow_id": str(workflow_id),
+            "profile_id": "",
+            "requires_clarification": True,
+            "risk_tolerance": "moderate",
+            "investment_objective": "growth",
+            "time_horizon": "long_term",
+        },
+        "research_scope": {
+            "workflow_id": str(workflow_id),
+            "scope_id": "",
+            "asset_types": ["public_stock"],
+            "named_candidates": ["NVIDIA"],
+            "candidate_limit": 1,
+        },
+        "assumptions": [],
+        "missing_fields": [],
+        "requires_clarification": False,
+        "clarification_questions": [],
+    }
+
+    planner = create_uninitialized_planner(
+        raw_result=json.dumps(malformed_payload)
+    )
+
+    result = planner.interpret_intake(
+        original_prompt=original_prompt,
+        workflow_id=workflow_id,
+    )
+
+    assert result.research_request.original_prompt == original_prompt
+    assert result.investor_profile.risk_tolerance == "moderate"
+    assert result.research_scope.named_candidates == ["NVIDIA"]
 
 
 def test_interpret_intake_calls_smolagents_run_once() -> None:
@@ -442,8 +496,14 @@ def test_interpret_intake_returns_clarification_result() -> None:
     assert result.clarification_questions
 
 
-def test_interpret_intake_rejects_modified_prompt() -> None:
-    """The planner should reject an altered original prompt."""
+def test_interpret_intake_overrides_modified_prompt() -> None:
+    """The planner should keep the caller's prompt, not the model's echo.
+
+    A model that reflows whitespace or fixes a stray character while
+    echoing the prompt back used to crash the whole workflow. Python
+    now owns that field, so the run succeeds with the caller's exact
+    string preserved.
+    """
 
     workflow_id = uuid4()
 
@@ -456,16 +516,15 @@ def test_interpret_intake_rejects_modified_prompt() -> None:
         raw_result=returned_result.model_dump_json()
     )
 
-    with pytest.raises(
-        ValueError,
-        match=(
-            "did not preserve the original prompt exactly"
-        ),
-    ):
-        planner.interpret_intake(
-            original_prompt="Original user prompt.",
-            workflow_id=workflow_id,
-        )
+    result = planner.interpret_intake(
+        original_prompt="Original user prompt.",
+        workflow_id=workflow_id,
+    )
+
+    assert (
+        result.research_request.original_prompt
+        == "Original user prompt."
+    )
 
 
 def test_interpret_intake_rejects_wrong_workflow() -> None:

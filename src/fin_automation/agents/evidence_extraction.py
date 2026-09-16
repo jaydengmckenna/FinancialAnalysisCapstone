@@ -49,11 +49,6 @@ class EvidenceExtractionAgent(ToolCallingAgent):
     ) -> tuple[SourceRecord, list[ExtractedEvidence], list[str]]:
         """Build a SourceRecord and extract evidence from one source."""
 
-        source_record = self._build_source_record(
-            selected_source=selected_source,
-            workflow_id=workflow_id,
-        )
-
         approved_requirement_ids = {
             requirement.requirement_id
             for requirement in evidence_requirements
@@ -79,6 +74,21 @@ class EvidenceExtractionAgent(ToolCallingAgent):
             for requirement in evidence_requirements
             if requirement.requirement_id in source_requirement_ids
         ]
+
+        candidate_names = {
+            requirement.candidate_name
+            for requirement in relevant_requirements
+            if requirement.candidate_name
+        }
+        if selected_source.candidate_name is None and len(candidate_names) == 1:
+            selected_source = selected_source.model_copy(
+                update={"candidate_name": next(iter(candidate_names))}
+            )
+
+        source_record = self._build_source_record(
+            selected_source=selected_source,
+            workflow_id=workflow_id,
+        )
 
         self._submission_tool.begin_run(
             source_record=source_record,
