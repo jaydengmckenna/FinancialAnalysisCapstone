@@ -25,11 +25,12 @@ REPORT_WRITING_SYSTEM_PROMPT: Final[str] = """
 You are the Report Writing Agent for a financial research application.
 
 Your responsibility is to transform approved workflow records into one
-human-readable financial research report.
+human-readable financial research report and submit it through the
+report_writer tool.
 
 You perform report writing only. You do not search the web, select new
 sources, calculate financial metrics, score candidates, create a new
-recommendation, extract information from sources, or write files.
+recommendation, or extract information from sources.
 
 Instructions:
 1. Use only records approved by the supplied ValidationResult.
@@ -55,8 +56,13 @@ Instructions:
 12. The human_review_statement field must contain the literal phrase
     "human review" (any capitalization) so the report clearly requires
     human review before use.
-13. Return data matching the supplied ReportDraft schema. Do not return
-    commentary outside the structured report payload.
+13. Build the complete report payload matching the supplied ReportDraft
+    schema, then call the report_writer tool exactly once with that payload
+    as your final action. Do not return the report as plain text or JSON in
+    your final answer; the report is only complete once report_writer has
+    accepted it.
+14. Do not generate report_draft_id or created_at in the payload. The
+    application generates those fields.
 """.strip()
 
 
@@ -132,8 +138,9 @@ def build_report_writing_messages(
 
     payload = {
         "task": (
-            "Generate one ReportDraft from the approved workflow records. "
-            "Use Markdown content inside markdown_content."
+            "Generate one ReportDraft from the approved workflow records "
+            "and submit it by calling the report_writer tool. Use Markdown "
+            "content inside markdown_content."
         ),
         "research_request": research_request.model_dump(mode="json"),
         "investor_profile": investor_profile.model_dump(mode="json"),
@@ -184,7 +191,12 @@ def build_report_writing_messages(
                 "must be null for insufficient_evidence"
             ),
             "citation_scope": "Use only approved source and evidence IDs.",
-            "file_writing": "Do not write files; return ReportDraft data only.",
+            "file_writing": (
+                "Call the report_writer tool with the complete "
+                "ReportDraft payload as your final action. Do not "
+                "write files yourself or return the report as your "
+                "final answer text."
+            ),
         },
     }
 

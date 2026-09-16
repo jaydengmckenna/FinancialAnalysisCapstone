@@ -1,5 +1,6 @@
 """Tests for the Phase 9 orchestrator boundary."""
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 
@@ -25,7 +26,7 @@ from fin_automation.models.intake import (
     ResearchScope,
 )
 from fin_automation.models.research import EvidenceRequirement, ResearchPlan, SearchQuery
-from fin_automation.models.reports import ReportDraft
+from fin_automation.models.reports import ReportArtifact, ReportDraft
 from fin_automation.models.sources import (
     ExtractedEvidence,
     SelectedSource,
@@ -165,7 +166,7 @@ class DummyEvidenceValidationAgent:
 
 class DummyReportAgent:
     def generate_report(self, **kwargs):
-        return ReportDraft(
+        report_draft = ReportDraft(
             workflow_id=kwargs["research_request"].workflow_id,
             validation_id=kwargs["validation_result"].validation_id,
             recommendation_id=kwargs["recommendation_result"].recommendation_id,
@@ -184,11 +185,19 @@ class DummyReportAgent:
             evidence_ids=[evidence.evidence_id for evidence in kwargs["evidence_records"]],
             calculation_ids=[calculation.calculation_id for calculation in kwargs["calculations"]],
         )
-
-
-class DummyWriter:
-    def forward(self, report_draft):
-        return report_draft
+        # The real ReportAgent now owns its writer tool and returns both
+        # the validated draft and the artifact the tool produced, since
+        # the orchestrator no longer calls a separate write step.
+        report_artifact = ReportArtifact(
+            workflow_id=report_draft.workflow_id,
+            report_draft_id=report_draft.report_draft_id,
+            artifact_type="markdown_report",
+            status="created",
+            file_name="report1.md",
+            relative_path="outputs/report1.md",
+            created_at=datetime.now(timezone.utc),
+        )
+        return report_draft, report_artifact
 
 
 def make_plan() -> ResearchPlan:
@@ -266,7 +275,6 @@ def test_orchestrator_runs_source_selection_on_approved_plan() -> None:
         financial_analysis_agent=DummyFinancialAnalysisAgent(),
         evidence_validation_agent=DummyEvidenceValidationAgent(),
         report_agent=DummyReportAgent(),
-        report_writer=DummyWriter(),
     )
 
     returned_plan, result = orchestrator.run("Research Example Inc")
@@ -291,7 +299,6 @@ def test_orchestrator_executes_full_phase_9_pipeline() -> None:
         financial_analysis_agent=DummyFinancialAnalysisAgent(),
         evidence_validation_agent=DummyEvidenceValidationAgent(),
         report_agent=DummyReportAgent(),
-        report_writer=DummyWriter(),
     )
 
     returned_plan, result = orchestrator.run("Research Example Inc")

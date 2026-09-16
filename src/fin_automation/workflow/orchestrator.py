@@ -35,14 +35,13 @@ from fin_automation.models.research import (
     AdditionalResearchRequest,
     ResearchPlan,
 )
-from fin_automation.models.reports import ReportDraft
+from fin_automation.models.reports import ReportArtifact, ReportDraft
 from fin_automation.models.sources import (
     ExtractedEvidence,
     SourceRecord,
     SourceSelection,
 )
 from fin_automation.models.validation import ValidationClaim, ValidationResult
-from fin_automation.tools.report_writer import ReportWriterTool
 from fin_automation.tools.tavily_search import TavilySearchTool
 
 
@@ -60,7 +59,6 @@ class ResearchOrchestrator:
         financial_analysis_agent: FinancialAnalysisAgent | None = None,
         evidence_validation_agent: EvidenceValidationAgent | None = None,
         report_agent: ReportAgent | None = None,
-        report_writer: ReportWriterTool | None = None,
     ) -> None:
         """Initialize the workflow components."""
 
@@ -100,7 +98,6 @@ class ResearchOrchestrator:
             evidence_validation_agent or EvidenceValidationAgent()
         )
         self.report_agent = report_agent or ReportAgent(model_to_use=self.model)
-        self.report_writer = report_writer or ReportWriterTool()
 
         self.last_intake_result: IntakeResult | None = None
         self.last_research_plan: ResearchPlan | None = None
@@ -714,8 +711,14 @@ class ResearchOrchestrator:
         source_records: list[SourceRecord],
         evidence_records: list[ExtractedEvidence],
         calculations: list[CalculatedMetric],
-    ) -> ReportDraft:
-        """Generate a validated report draft from approved workflow data."""
+    ) -> ReportArtifact:
+        """Generate, validate, and write the report from approved data.
+
+        The Report Writing Agent owns its own report-writer tool and
+        calls it directly as part of generating the report, so this
+        method's single retry-wrapped call covers drafting and writing
+        together. There is no separate write step afterward.
+        """
 
         if self.report_agent is None:
             raise ValueError("Report agent is not configured.")
@@ -728,7 +731,7 @@ class ResearchOrchestrator:
         # that evidence validation just approved. Rebuilding fresh ones
         # here would produce different random recommendation_id and
         # analysis_id values than what validation actually checked, which
-        # the report-writing prompt correctly refuses to accept.
+        # the report-writing tool correctly refuses to accept.
         recommendation = self.last_recommendation
         candidate_analyses = self.last_candidate_analyses
         if recommendation is None:
@@ -737,7 +740,7 @@ class ResearchOrchestrator:
                 "validation pass with a cached recommendation."
             )
 
-        report_draft = self._run_with_retries(
+        report_draft, report_artifact = self._run_with_retries(
             "Report generation",
             lambda: self.report_agent.generate_report(
                 research_request=intake_result.research_request,
@@ -753,14 +756,8 @@ class ResearchOrchestrator:
             ),
         )
         self.last_report_draft = report_draft
-        return report_draft
-
-    def run_write_report(self, report_draft: ReportDraft):
-        """Write the final markdown report to the output directory."""
-
-        artifact = self.report_writer.forward(report_draft)
-        self.last_report_artifact = artifact
-        return artifact
+        self.last_report_artifact = report_artifact
+        return report_artifact
 
     def run(self, original_prompt: str) -> tuple[ResearchPlan, SourceSelection]:
         """Execute the full Phase 9 workflow while keeping the original return contract."""
@@ -816,14 +813,13 @@ class ResearchOrchestrator:
                 )
                 break
 
-            report_draft = self.run_report_generation(
+            self.run_report_generation(
                 research_plan=research_plan,
                 validation_result=validation_result,
                 source_records=source_records,
                 evidence_records=evidence_records,
                 calculations=calculations,
             )
-            self.run_write_report(report_draft)
             break
 
         return research_plan, source_selection
