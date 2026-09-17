@@ -1694,9 +1694,12 @@ evidence gaps — revenue, net income, gross profit for a named ticker and
 fiscal year — before calculating, independent of whether web search
 found them. This is plain Python, not an agentic tool call, since
 looking up a named metric involves no judgment. A live run with this in
-place produced `outputs/report5.md`: a genuine `qualified_recommendation`
-with a correct calculated growth rate and real citations, the first of
-the session. `FinancialDataTool` itself was also verified directly
+place produced the first genuine `qualified_recommendation` of the
+session, with a correct calculated growth rate and real citations.
+(Debug-run reports from this stage of Phase 9 were cleaned out of
+`outputs/` once the fixes were verified; see the example reports kept
+under `outputs/` for current, representative output instead.)
+`FinancialDataTool` itself was also verified directly
 against the live Yahoo Finance service, including a fiscal-year search
 fix (a naive "most recent fiscal year" offset would have silently
 mislabeled a different year's figure under the requested year's label;
@@ -1824,7 +1827,13 @@ Phase 9 depends on completion of Phases 5 through 8.
 
 ### Status
 
-Not Started
+Not Started. A meaningful amount of the coverage below already exists
+incidentally, built alongside Phases 6 through 9 rather than as a
+dedicated Phase 10 effort — see the inline notes on each item below
+(reviewed 2026-09-17). Phase 10 has not formally started because the
+traceability mapping, saved test-results artifact, and final
+acceptance review do not exist in any form yet, and several
+adversarial scenarios genuinely have no coverage.
 
 ### Goal
 
@@ -1835,67 +1844,113 @@ workflow for the first time.
 
 ### Planned Deliverables
 
-- Complete unit-test suite.
-- Complete happy-path suite.
-- Complete failure-path suite.
-- Complete adversarial suite.
-- End-to-end tests.
-- Requirement-to-test traceability mapping.
-- Test-results artifact.
-- Defect corrections.
-- Final acceptance review.
+- [x] Unit-test suite. 332 tests exist across models, tools, agents,
+      prompts, and the orchestrator (`tests/`).
+- [~] Happy-path suite. Largely covered incidentally; see the
+      Planned Happy-Path Coverage notes below.
+- [~] Failure-path suite. Partially covered; see the Planned
+      Adversarial Coverage notes below for the specific gaps.
+- [~] Adversarial suite. Roughly 9 of 17 documented scenarios are
+      already covered; see notes below for the rest.
+- [~] End-to-end tests. `test_orchestrator_executes_full_phase_9_pipeline`
+      exercises the full pipeline with dummy agents; no test yet
+      exercises the full pipeline through failure/correction paths.
+- [ ] Requirement-to-test traceability mapping. Does not exist yet.
+- [ ] Test-results artifact. Does not exist yet.
+- [ ] Defect corrections. Ongoing as gaps are found; not yet closed
+      out for Phase 10 specifically.
+- [ ] Final acceptance review. Does not exist yet.
 
 ### Planned Happy-Path Coverage
 
 Tests will verify that:
 
-- A valid request is interpreted.
-- Required intake values are validated.
-- A research plan is created.
-- Web search returns structured results.
-- Sources are selected and retrieved.
-- Webpages are parsed into evidence records.
-- Financial calculations produce expected results.
-- Candidates are compared.
-- Evidence validation approves a supported result.
-- A Markdown report is written.
+- [x] A valid request is interpreted. `test_interpret_and_validate_returns_complete_intake`.
+- [x] Required intake values are validated. `test_clarification_gate_rejects_incomplete_intake`.
+- [x] A research plan is created. `test_create_research_plan_returns_valid_plan`.
+- [~] Web search returns structured results. Covered at the tool-contract
+      level (`test_tavily_search_accepts_current_sdk_depths`); no test
+      mocks a full source-selection pass against varied search results.
+- [x] Sources are selected and retrieved. `test_orchestrator_runs_source_selection_on_approved_plan`.
+- [~] Webpages are parsed into evidence records. Deterministic record
+      construction is covered (`test_build_source_record_preserves_selected_source`);
+      no test exercises the extraction agent against realistic mocked
+      HTML/parsed content.
+- [x] Financial calculations produce expected results. `test_growth_rate_uses_authoritative_evidence`.
+- [~] Candidates are compared. Single-candidate scoring is covered
+      (`test_score_financial_performance_*`); no dedicated multi-candidate
+      comparison test exists.
+- [x] Evidence validation approves a supported result. `test_supported_calculated_claim_is_approved`.
+- [x] A Markdown report is written. `test_forward_writes_valid_payload`.
 
 ### Planned Adversarial Coverage
 
 Tests will verify behavior when:
 
-- Investor-profile information is missing.
-- Search returns no relevant results.
-- A webpage cannot be retrieved.
-- Webpage content is malformed.
-- Scraped content contains prompt injection.
-- A source identifier is fabricated.
-- A citation does not support its claim.
-- Sources materially conflict.
-- Financial values use incompatible periods or units.
-- A financial value is missing or invalid.
-- P/E is not applicable.
-- Duplicate sources attempt to inflate confidence.
-- A recommendation guarantees returns.
-- A recommendation removes material risks.
-- The Report Writing Agent introduces unsupported facts.
-- An external service returns invalid structured output.
-- A file path attempts to escape the output directory.
-- File writing fails.
+- [x] Investor-profile information is missing. `test_clarification_gate_rejects_incomplete_intake`.
+- [ ] Search returns no relevant results. No test found; genuinely
+      missing.
+- [~] A webpage cannot be retrieved. Covered at the model-contract
+      level (`test_failed_retrieval_requires_error_message`); no
+      agent-level test simulates an actual failed fetch.
+- [ ] Webpage content is malformed. No agent-level test found;
+      genuinely missing.
+- [x] Scraped content contains prompt injection. `test_prompt_injection_in_evidence_is_not_workflow_instruction`.
+- [x] A source identifier is fabricated. `test_unknown_citation_is_rejected`.
+- [x] A citation does not support its claim. `test_unrelated_citation_requires_analysis_correction`,
+      `test_text_supported_rejects_unrelated_evidence`.
+- [ ] Sources materially conflict. No dedicated test found; genuinely
+      missing.
+- [x] Financial values use incompatible periods or units. `test_incompatible_units_are_rejected`,
+      `test_is_covered_false_when_evidence_is_for_a_different_year`.
+- [x] A financial value is missing or invalid. `test_missing_financial_input_rejects_value`.
+- [N/A] P/E is not applicable. `PRICE_TO_EARNINGS` exists only as an
+      enum value; no P/E computation path exists in
+      `FinancialCalculationTool` or `FinancialDataTool` to test. Not a
+      gap — there is nothing implemented to exercise.
+- [ ] Duplicate sources attempt to inflate confidence. No test or
+      defense found. Worth prioritizing: a live run during Phase 9 QA
+      (2026-09-17) showed the same source URL cited multiple times as
+      if independent, and nothing currently detects or dedupes this.
+- [x] A recommendation guarantees returns. `test_unsafe_recommendation_is_rejected`.
+- [~] A recommendation removes material risks. The check exists in
+      code (`EvidenceValidationService`, `if not recommendation.material_risks`),
+      but no test exercises an empty `material_risks` list to confirm
+      it fires.
+- [~] The Report Writing Agent introduces unsupported facts. Evidence-ID
+      authorization is covered (`test_forward_rejects_unapproved_evidence_id`);
+      no test targets fabricated prose facts with no evidence ID at
+      all.
+- [x] An external service returns invalid structured output. `test_parse_intake_result_rejects_invalid_json`,
+      `test_parse_research_plan_rejects_invalid_json`.
+- [x] A file path attempts to escape the output directory. `test_artifact_rejects_unsafe_path`.
+- [ ] File writing fails. No test simulates a filesystem write error;
+      genuinely missing.
 
 ### Exit Criteria
 
 Phase 10 is complete when:
 
-- Required unit tests pass.
-- Happy-path tests pass.
-- Failure-path tests pass.
-- Adversarial tests pass.
-- Major requirements map to tests or acceptance checks.
-- External dependencies are mocked appropriately.
-- Saved fixtures support repeatable scraping tests.
-- No known failure allows an unsupported recommendation to be approved.
-- Test results are preserved as a project artifact.
+- [x] Required unit tests pass. 332 tests pass today.
+- [~] Happy-path tests pass. See the annotated list above for what
+      still needs dedicated coverage.
+- [~] Failure-path tests pass. See the annotated list above.
+- [ ] Adversarial tests pass. See the annotated list above — several
+      scenarios have no test yet.
+- [ ] Major requirements map to tests or acceptance checks. No
+      traceability mapping exists yet.
+- [x] External dependencies are mocked appropriately, for the tests
+      that exist. `yfinance`, OpenAI, and Tavily are all mocked in
+      today's suite; no live API call is required to run it.
+- [ ] Saved fixtures support repeatable scraping tests. No saved
+      HTML/scraping fixtures exist yet.
+- [~] No known failure allows an unsupported recommendation to be
+      approved. True for every scenario checked so far, but the
+      "duplicate sources" and "sources materially conflict" gaps above
+      mean this hasn't been verified against every documented
+      scenario.
+- [ ] Test results are preserved as a project artifact. Does not
+      exist yet.
 
 ### Dependencies
 
