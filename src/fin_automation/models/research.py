@@ -35,6 +35,7 @@ class EvidenceRequirement(ResearchBaseModel):
     name: str = Field(min_length=1)
     description: str = Field(min_length=1)
     candidate_name: str | None = None
+    ticker: str | None = None
     search_purpose: SearchPurpose
     preferred_source_categories: list[SourceCategory] = Field(
         min_length=1

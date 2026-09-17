@@ -55,36 +55,44 @@ Follow these requirements:
     requirement asking Source Selection to find a source that already
     states the conclusion cannot be satisfied.
 12. Give every evidence requirement a unique identifier.
-13. Create search queries that support the approved evidence
+13. When an evidence requirement is for a specific, named, publicly
+    traded company's financial-statement figure (such as revenue, net
+    income, or gross profit), also set that requirement's ticker field
+    to the company's real stock ticker symbol (for example NVDA for
+    NVIDIA, AAPL for Apple). Only set it when you are confident of the
+    correct ticker for a well-known public company; leave ticker unset
+    rather than guess. This lets the application look up the exact
+    figure directly when web search does not find it.
+14. Create search queries that support the approved evidence
     requirements.
-14. Give every search query a unique identifier.
-15. Ensure every search query references at least one evidence
+15. Give every search query a unique identifier.
+16. Ensure every search query references at least one evidence
     requirement.
-16. Ensure each search query has the same search purpose as at least
+17. Ensure each search query has the same search purpose as at least
     one evidence requirement it references.
-17. Prefer primary sources for directly reported company financial
+18. Prefer primary sources for directly reported company financial
     information.
-18. Prefer reputable secondary sources for independent context or
+19. Prefer reputable secondary sources for independent context or
     corroboration.
-19. Do not prefer unsupported source categories.
-20. Include both favorable and unfavorable research areas.
-21. Include material risks that could weaken a candidate.
-22. Do not invent investor preferences, exclusions, constraints,
+20. Do not prefer unsupported source categories.
+21. Include both favorable and unfavorable research areas.
+22. Include material risks that could weaken a candidate.
+23. Do not invent investor preferences, exclusions, constraints,
     financial values, sources, evidence, calculations, rankings, or
     recommendations.
-23. Record necessary planning assumptions explicitly.
-24. Do not resolve missing material information through a silent
+24. Record necessary planning assumptions explicitly.
+25. Do not resolve missing material information through a silent
     assumption.
-25. Use only the supported SearchPurpose values supplied by the output
+26. Use only the supported SearchPurpose values supplied by the output
     schema.
-26. Use only the supported SourceCategory values supplied by the output
+27. Use only the supported SourceCategory values supplied by the output
     schema.
-27. Return a ResearchPlan for the same workflow as the validated
+28. Return a ResearchPlan for the same workflow as the validated
     intake.
-28. Return the final answer as one JSON object only.
-29. Do not wrap the JSON object in Markdown code fences.
-30. Do not provide explanations before or after the JSON object.
-31. Return only data conforming to the required ResearchPlan schema.
+29. Return the final answer as one JSON object only.
+30. Do not wrap the JSON object in Markdown code fences.
+31. Do not provide explanations before or after the JSON object.
+32. Return only data conforming to the required ResearchPlan schema.
 
 The current operation plans research. The operation does not perform
 the research.

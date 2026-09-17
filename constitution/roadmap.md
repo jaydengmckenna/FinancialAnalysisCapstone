@@ -67,11 +67,22 @@ The roadmap uses the following statuses:
 
 ## Current Focus
 
-The project has completed Phase 8: Markdown Report Generation and is now
-advancing Phase 9: Complete Product Workflow. The current product scope
-remains focused on a human-readable Markdown report for review by the
-investor or analyst, with deterministic validation and safety controls
-applied before the report is written.
+Phase 9: Complete Product Workflow is functionally working end to end:
+a natural-language request now runs through intake, research planning,
+source selection, evidence extraction, financial calculation, evidence
+validation, and report writing, and produces a validated Markdown report
+in the approved output directory. Three of the five agents (Source
+Selection, Financial Analysis, Report Writing) call their own tools
+directly rather than being driven by deterministic Python after the
+fact.
+
+Phase 9 is not yet marked Completed. Two things remain open, detailed in
+the Phase 9 section below: evidence extraction does not yet reliably
+retrieve real financial figures from live sources (every live run so
+far has produced a correctly-formed insufficient-evidence report rather
+than a qualified recommendation), and the formal `WorkflowState`/
+`StageResult` failure-handling machinery has not been built and may be
+descoped rather than implemented, pending further review.
 
 ---
 
@@ -1657,21 +1668,71 @@ handoff while staying within the project scope of a human-readable
 Markdown report for review rather than a machine-consumed JSON artifact
 workflow. Broader quality verification belongs to Phase 10.
 
+### Current Implementation Status (2026-09-17, updated)
+
+The core end-to-end workflow runs and has been verified with multiple
+live runs: intake, research planning, source selection, evidence
+extraction, financial calculation, evidence validation, and report
+writing all execute in sequence and produce a validated Markdown report
+in `outputs/`. Source Selection, Financial Analysis, and Report Writing
+call their own tools directly as part of their own reasoning, rather
+than being driven by deterministic Python after the fact.
+
+The evidence-reliability gap noted earlier today is resolved. Live web
+search alone was not reliably producing exact numeric financial figures
+(no usable source some runs, unextractable figures in large filings on
+others), so `FinancialAnalysisAgent` now also owns a deterministic
+`FinancialDataTool` (yfinance-backed) that fills specific numeric
+evidence gaps — revenue, net income, gross profit for a named ticker and
+fiscal year — before calculating, independent of whether web search
+found them. This is plain Python, not an agentic tool call, since
+looking up a named metric involves no judgment. A live run with this in
+place produced `outputs/report5.md`: a genuine `qualified_recommendation`
+with a correct calculated growth rate and real citations, the first of
+the session. `FinancialDataTool` itself was also verified directly
+against the live Yahoo Finance service, including a fiscal-year search
+fix (a naive "most recent fiscal year" offset would have silently
+mislabeled a different year's figure under the requested year's label;
+it now searches back through recent fiscal years for the one actually
+requested).
+
+One thing remains open before Phase 9 can be marked Completed:
+
+- The formal `WorkflowState`/`StageResult` contracts defined in Phase 4,
+  the "Analysis correction behavior" deliverable, and consuming the
+  existing `ValidationCorrectionRouter` to route corrections, are not
+  implemented. The orchestrator currently tracks ad-hoc `last_*`
+  instance attributes instead of building those formal contracts, and a
+  validation outcome of `analysis_correction_required` currently
+  receives the same treatment as an outright rejection (the workflow
+  stops) rather than a distinct bounded correction path. Whether to
+  implement this or descope it from Phase 9 given time constraints is
+  an open decision that has not yet been made.
+
 ### Planned Deliverables
 
-- Complete orchestrator implementation.
-- `WorkflowState` implementation.
-- Stage-result tracking.
-- Agent and tool assignments.
-- Intake clarification behavior.
-- Research retry behavior.
-- Analysis correction behavior.
-- Validation routing.
-- Markdown report handoff and output-path handling.
-- Bounded retry and correction limits.
-- Structured workflow failure handling.
-- Example end-to-end execution.
-- Product smoke test.
+- [x] Complete orchestrator implementation.
+- [ ] `WorkflowState` implementation. Not started; open scope decision.
+- [ ] Stage-result tracking. Not started; open scope decision.
+- [x] Agent and tool assignments.
+- [x] Intake clarification behavior.
+- [x] Research retry behavior.
+- [ ] Analysis correction behavior. Not started; open scope decision.
+- [ ] Validation routing. `ValidationCorrectionRouter` exists (Phase 7)
+      but is not consumed by the orchestrator; open scope decision.
+- [x] Markdown report handoff and output-path handling.
+- [x] Bounded retry and correction limits, for model-call retries and
+      the additional-research loop. Not yet true for an
+      analysis-correction-required outcome, since that behavior does
+      not exist yet.
+- [ ] Structured workflow failure handling. `WorkflowError` is raised
+      when retries are exhausted but nothing catches it yet, and there
+      is no formal `WorkflowState` result; open scope decision.
+- [x] Example end-to-end execution. `outputs/report1.md` through
+      `report4.md` reached a validated `insufficient_evidence` outcome;
+      `outputs/report5.md` reached a genuine `qualified_recommendation`
+      with a correct calculated growth rate and real citations.
+- [x] Product smoke test (`run_smoke_test.py`).
 
 ### Planned Workflow
 
@@ -1697,20 +1758,25 @@ workflow. Broader quality verification belongs to Phase 10.
 
 Phase 9 is complete when:
 
-- The orchestrator controls the complete workflow order.
-- Agents receive only approved tools.
-- All major stage outputs conform to Pydantic contracts.
-- Failed required stages prevent invalid downstream processing.
-- Required clarification stops research until resolved.
-- Recoverable failures use bounded correction paths.
-- Unrecoverable failures produce structured errors.
-- Only validated results proceed to report generation.
-- A complete research request produces a validated Markdown report in the
-  approved output directory.
-- The workflow does not execute any financial transaction.
-- The product returns the report path and structured workflow status for
-  human review.
-- The bounded product smoke test passes.
+- [x] The orchestrator controls the complete workflow order.
+- [x] Agents receive only approved tools.
+- [x] All major stage outputs conform to Pydantic contracts.
+- [x] Failed required stages prevent invalid downstream processing.
+- [x] Required clarification stops research until resolved.
+- [x] Recoverable failures use bounded correction paths, for model-call
+      retries and the additional-research loop. Not yet true for an
+      analysis-correction-required validation outcome.
+- [ ] Unrecoverable failures produce structured errors. `WorkflowError`
+      exists and is raised, but nothing catches it yet, and there is no
+      formal `WorkflowState` result.
+- [x] Only validated results proceed to report generation.
+- [x] A complete research request produces a validated Markdown report
+      in the approved output directory.
+- [x] The workflow does not execute any financial transaction.
+- [x] The product returns the report path and a status summary for
+      human review, printed by `main.py`. Not yet a formal
+      `WorkflowState` object.
+- [x] The bounded product smoke test passes.
 
 ### Dependencies
 

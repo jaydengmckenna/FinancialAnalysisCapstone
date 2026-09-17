@@ -8,3 +8,4 @@ requests
 smolagents
 tavily-python
 pydantic-settings
+yfinance

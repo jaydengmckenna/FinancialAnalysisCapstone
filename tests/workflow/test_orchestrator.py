@@ -128,7 +128,7 @@ class DummyEvidenceExtractionAgent:
 
 
 class DummyFinancialAnalysisAgent:
-    def analyze(self, evidence, workflow_id):
+    def analyze(self, evidence, evidence_requirements, workflow_id):
         current, previous = evidence[:2]
         return (
             [
@@ -146,6 +146,10 @@ class DummyFinancialAnalysisAgent:
                 )
             ],
             "analysis complete",
+            # No new evidence/sources in this dummy: real gap-filling
+            # is exercised by the FinancialDataTool/agent tests instead.
+            [],
+            [],
         )
 
 

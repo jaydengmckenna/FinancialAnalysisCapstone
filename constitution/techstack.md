@@ -286,6 +286,56 @@ Calculation functions should:
 The exact formulas, scoring criteria, and weights will be defined in the
 recommendation-methodology specification before implementation.
 
+## Financial Data Retrieval
+
+### yfinance
+
+Added 2026-09-17. Live web research through Tavily proved unreliable at
+retrieving exact numeric financial figures: search sometimes returned no
+usable source at all, and when it did return a real primary source (for
+example an SEC 10-K filing), the figures sat inside large financial
+tables that scraped raw text could not reliably extract. `yfinance` is
+an unofficial Python wrapper around Yahoo Finance's data endpoints that
+returns already-structured, already-parsed financial figures, removing
+the extraction step for this category of data entirely.
+
+`yfinance` will be used to:
+
+- Retrieve a named company's reported financial-statement figures
+  (initially total revenue, net income, and gross profit) for a given
+  fiscal period, identified by ticker symbol.
+- Supply evidence for numeric financial-calculation inputs when web
+  search has not already produced usable evidence for the same
+  requirement.
+
+It will not be used for market sentiment, qualitative research, news, or
+any requirement that is not a specific, named financial-statement
+figure. Tavily remains the source for that material; this is a narrow
+addition, not a replacement for the web-research path.
+
+Access is deterministic Python, not an agentic tool call. Retrieving a
+specific ticker's specific metric for a specific period involves no
+judgment, the same way the deterministic calculation tool performs
+arithmetic without model involvement; `FinancialAnalysisAgent` owns and
+calls this directly rather than exposing it as something the model
+decides whether to invoke.
+
+`yfinance` is an unofficial library against undocumented endpoints, not
+a stable public API. It can fail for reasons unrelated to whether the
+data exists (upstream format changes, rate limiting). A failed or empty
+lookup must be treated the same as any other missing-evidence case,
+never as a fatal error.
+
+Retrieved values are normalized to a single fixed unit (billions of the
+reporting company's native currency) at the point of retrieval, so every
+value this tool produces is self-consistent without needing to detect or
+reconcile per-request unit differences.
+
+Different companies use different fiscal year-end months, so periods are
+selected by relative recency (the most recently completed fiscal year,
+the year before that, and so on) rather than by mapping a literal "FY"
+label to a specific calendar date.
+
 ## Testing
 
 ### pytest
@@ -665,6 +715,7 @@ research:
   web_search: Tavily
   http_retrieval: requests
   html_parsing: Beautiful Soup 4
+  financial_data_retrieval: yfinance
 
 data:
   validation: Pydantic

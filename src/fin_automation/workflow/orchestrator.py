@@ -33,6 +33,7 @@ from fin_automation.models.financial import (
 from fin_automation.models.intake import IntakeResult
 from fin_automation.models.research import (
     AdditionalResearchRequest,
+    EvidenceRequirement,
     ResearchPlan,
 )
 from fin_automation.models.reports import ReportArtifact, ReportDraft
@@ -340,19 +341,35 @@ class ResearchOrchestrator:
     def run_financial_analysis(
         self,
         evidence_records: list[ExtractedEvidence],
+        evidence_requirements: list[EvidenceRequirement],
         workflow_id: UUID,
-    ) -> tuple[list[CalculatedMetric], str]:
-        """Run the financial-analysis stage using extracted evidence."""
+    ) -> tuple[list[CalculatedMetric], str, list[ExtractedEvidence], list[SourceRecord]]:
+        """Run the financial-analysis stage using extracted evidence.
 
-        if not evidence_records:
-            return [], "No evidence was available for financial analysis."
+        The Financial Analysis Agent may fill evidence gaps via
+        yfinance before calculating, so this can still produce usable
+        evidence even when `evidence_records` started out empty (for
+        example, because source selection found no usable sources).
 
-        calculations, interpretation = self.financial_analysis_agent.analyze(
-            evidence=evidence_records,
-            workflow_id=workflow_id,
+        Returns:
+            The accepted calculations, the model's interpretation, the
+            evidence list combined with anything yfinance filled in,
+            and the source records that new evidence cites. Callers
+            must use the returned evidence/source lists downstream
+            (for validation and reporting), not the original inputs,
+            since those no longer reflect everything that was found.
+        """
+
+        calculations, interpretation, new_evidence, new_sources = (
+            self.financial_analysis_agent.analyze(
+                evidence=evidence_records,
+                evidence_requirements=evidence_requirements,
+                workflow_id=workflow_id,
+            )
         )
+        combined_evidence = evidence_records + new_evidence
         self.last_calculations = calculations
-        return calculations, interpretation
+        return calculations, interpretation, combined_evidence, new_sources
 
     @staticmethod
     def _default_material_risks(research_plan: ResearchPlan) -> list[str]:
@@ -773,10 +790,24 @@ class ResearchOrchestrator:
                 source_selection=source_selection,
                 research_plan=research_plan,
             )
-            calculations, _ = self.run_financial_analysis(
+            (
+                calculations,
+                _,
+                evidence_records,
+                new_sources,
+            ) = self.run_financial_analysis(
                 evidence_records=evidence_records,
+                evidence_requirements=research_plan.evidence_requirements,
                 workflow_id=research_plan.workflow_id,
             )
+            # run_financial_analysis may have filled gaps via yfinance,
+            # so evidence_records above is now the combined list, and
+            # any new source records it cites need to join the
+            # workflow's own source list before validation checks
+            # citations against it.
+            source_records = source_records + new_sources
+            self.last_source_records = source_records
+            self.last_evidence_records = evidence_records
 
             if self.last_intake_result is None:
                 break
