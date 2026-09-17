@@ -106,7 +106,7 @@ class FinancialDataTool:
             return None
         if period_offset < 0:
             return None
-
+        
         try:
             ticker_obj = yf.Ticker(ticker=ticker.strip().upper())
             financials = ticker_obj.financials

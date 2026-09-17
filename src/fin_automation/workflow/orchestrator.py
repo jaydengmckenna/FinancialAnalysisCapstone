@@ -1,6 +1,7 @@
 """Orchestration for the full planned research workflow."""
 
 from decimal import Decimal
+import logging
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -44,6 +45,9 @@ from fin_automation.models.sources import (
 )
 from fin_automation.models.validation import ValidationClaim, ValidationResult
 from fin_automation.tools.tavily_search import TavilySearchTool
+
+
+logger = logging.getLogger(__name__)
 
 
 class ResearchOrchestrator:
@@ -164,11 +168,20 @@ class ResearchOrchestrator:
                 return action()
             except ValueError as error:
                 last_error = error
-                print(
-                    f"{stage_name} attempt {attempt} of "
-                    f"{self._MAX_MODEL_ATTEMPTS} failed: {error}"
+                logger.warning(
+                    "%s attempt %d of %d failed: %s",
+                    stage_name,
+                    attempt,
+                    self._MAX_MODEL_ATTEMPTS,
+                    error,
                 )
 
+        logger.error(
+            "%s failed after %d attempts. Last error: %s",
+            stage_name,
+            self._MAX_MODEL_ATTEMPTS,
+            last_error,
+        )
         raise WorkflowError(
             f"{stage_name} failed after {self._MAX_MODEL_ATTEMPTS} "
             f"attempts. Last error: {last_error}"
@@ -222,6 +235,7 @@ class ResearchOrchestrator:
                 if isinstance(planner_intake, IntakeResult):
                     self.last_intake_result = planner_intake
                 self.last_research_plan = result
+                self._log_research_plan_created(result)
                 return result
 
             if not isinstance(result, IntakeResult):
@@ -240,14 +254,44 @@ class ResearchOrchestrator:
                     ),
                 )
                 self.last_research_plan = plan
+                self._log_research_plan_created(plan)
                 return plan
 
+            logger.info(
+                "Intake requires clarification: %d missing field(s).",
+                len(result.missing_fields),
+            )
             clarification_context = self._resolve_clarification(
                 original_prompt=current_prompt,
                 intake_result=result,
                 workflow_id=workflow_id,
                 clarification_context=clarification_context,
             )
+
+    @staticmethod
+    def _log_research_plan_created(plan: ResearchPlan) -> None:
+        """Log the new plan's scope, including any tickers supplied."""
+
+        candidate_tickers = dict.fromkeys(
+            (
+                requirement.candidate_name,
+                requirement.ticker,
+            )
+            for requirement in plan.evidence_requirements
+            if requirement.candidate_name
+        )
+        candidate_summary = "; ".join(
+            f"{name} (ticker={ticker})" if ticker else f"{name} (no ticker)"
+            for name, ticker in candidate_tickers
+        ) or "none named"
+
+        logger.info(
+            "Research plan created: %d evidence requirement(s), %d "
+            "search queries. Candidates: %s.",
+            len(plan.evidence_requirements),
+            len(plan.search_queries),
+            candidate_summary,
+        )
 
     def run_source_selection(
         self,
@@ -271,6 +315,14 @@ class ResearchOrchestrator:
             attempt,
         )
         self.last_source_selection = source_selection
+        selected_count = sum(
+            1 for selection in source_selection.selections if selection.selected
+        )
+        logger.info(
+            "Source selection completed: status=%s, %d source(s) selected.",
+            source_selection.status.value,
+            selected_count,
+        )
         return source_selection
 
     def run_extract_evidence(
@@ -304,6 +356,13 @@ class ResearchOrchestrator:
 
         self.last_source_records = source_records
         self.last_evidence_records = evidence_records
+        logger.info(
+            "Evidence extraction completed: %d evidence record(s) "
+            "extracted from %d source(s), %d gap(s) remaining.",
+            len(evidence_records),
+            len(source_records),
+            len(evidence_gaps),
+        )
         return source_records, evidence_records, evidence_gaps
 
     @staticmethod
@@ -369,6 +428,16 @@ class ResearchOrchestrator:
         )
         combined_evidence = evidence_records + new_evidence
         self.last_calculations = calculations
+        if new_evidence:
+            logger.info(
+                "Financial analysis filled %d evidence gap(s) via "
+                "yfinance.",
+                len(new_evidence),
+            )
+        logger.info(
+            "Financial analysis completed: %d calculation(s) produced.",
+            len(calculations),
+        )
         return calculations, interpretation, combined_evidence, new_sources
 
     @staticmethod
@@ -719,6 +788,18 @@ class ResearchOrchestrator:
             claims=claims,
         )
         self.last_validation_result = validation_result
+        if validation_result.outcome.value == "approved":
+            logger.info(
+                "Evidence validation approved: %s",
+                validation_result.summary,
+            )
+        else:
+            logger.warning(
+                "Evidence validation failed: outcome=%s, %d finding(s). %s",
+                validation_result.outcome.value,
+                len(validation_result.findings),
+                validation_result.summary,
+            )
         return validation_result
 
     def run_report_generation(
@@ -774,10 +855,17 @@ class ResearchOrchestrator:
         )
         self.last_report_draft = report_draft
         self.last_report_artifact = report_artifact
+        logger.info(
+            "Report written: %s (outcome=%s).",
+            report_artifact.relative_path,
+            report_draft.recommendation_outcome.value,
+        )
         return report_artifact
 
     def run(self, original_prompt: str) -> tuple[ResearchPlan, SourceSelection]:
         """Execute the full Phase 9 workflow while keeping the original return contract."""
+
+        logger.info("Workflow started for request: %s", original_prompt)
 
         research_plan = self.run_intake_and_plan(original_prompt)
         source_selection = self.run_source_selection(research_plan)
@@ -838,9 +926,9 @@ class ResearchOrchestrator:
                 continue
 
             if validation_result.outcome.value != "approved":
-                print(
-                    "Validation did not approve the report: "
-                    f"{validation_result.summary}"
+                logger.info(
+                    "Workflow terminated without a report: validation "
+                    "did not approve the result."
                 )
                 break
 
@@ -851,6 +939,7 @@ class ResearchOrchestrator:
                 evidence_records=evidence_records,
                 calculations=calculations,
             )
+            logger.info("Workflow completed successfully.")
             break
 
         return research_plan, source_selection

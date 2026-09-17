@@ -1,11 +1,13 @@
 """Minimal Financial Analysis Agent for Phase 6."""
 
 from datetime import date
+import logging
 import re
 from uuid import UUID, uuid4
 
 from pydantic import AnyHttpUrl
 from smolagents import Model, ToolCallingAgent
+import yfinance
 
 from fin_automation.models.common import ParsingStatus, SourceCategory
 from fin_automation.models.financial import CalculatedMetric
@@ -22,6 +24,9 @@ from fin_automation.tools.financial_data import (
     FinancialDataPoint,
     FinancialDataTool,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class FinancialAnalysisAgent(ToolCallingAgent):
@@ -78,12 +83,30 @@ class FinancialAnalysisAgent(ToolCallingAgent):
             records into the workflow's own lists before validation.
         """
 
+        logger.info(
+            "Financial Analysis Agent starting: %d evidence record(s) "
+            "on hand, %d evidence requirement(s) to satisfy.",
+            len(evidence),
+            len(evidence_requirements),
+        )
+
         new_evidence, new_sources = self._fill_missing_evidence(
             evidence=evidence,
             evidence_requirements=evidence_requirements,
             workflow_id=workflow_id,
         )
         combined_evidence = evidence + new_evidence
+
+        for record in combined_evidence:
+            logger.info(
+                "Evidence on hand: %s %s = %s %s %s (%s).",
+                record.candidate_name or "unknown candidate",
+                record.evidence_type,
+                record.reported_value,
+                record.unit or "",
+                record.currency or "",
+                record.reporting_period or "period unknown",
+            )
 
         if not combined_evidence:
             # Nothing from web research and nothing yfinance could fill.
@@ -109,6 +132,15 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                 reset=True,
             )
         )
+
+        for calculation in self._calculation_tool.accepted_calculations:
+            logger.info(
+                "Calculated %s for %s: %s %s.",
+                calculation.metric_name,
+                ", ".join(calculation.candidate_names),
+                calculation.value,
+                calculation.unit or "",
+            )
 
         return (
             self._calculation_tool.accepted_calculations,
@@ -138,18 +170,54 @@ class FinancialAnalysisAgent(ToolCallingAgent):
             if not self._is_covered(requirement, evidence)
         ]
 
+        if not gaps:
+            logger.info(
+                "Financial Analysis Agent: all evidence requirements "
+                "already covered; yfinance not needed."
+            )
+            return [], []
+
         new_evidence: list[ExtractedEvidence] = []
         new_sources: list[SourceRecord] = []
 
         for requirement in gaps:
             if self._fill_data.resolve_metric_row(requirement.name) is None:
+                logger.info(
+                    "Evidence gap '%s' (%s) is not a recognized "
+                    "financial metric; yfinance cannot help, leaving "
+                    "as a gap.",
+                    requirement.name,
+                    requirement.candidate_name or "unknown candidate",
+                )
                 continue
-            if requirement.ticker is None:
-                continue
-
+            logger.info(
+                "Financial Analysis Agent: falling back to yfinance for "
+                "'%s' — candidate=%s, ticker=%s.",
+                requirement.name,
+                requirement.candidate_name or "unknown candidate",
+                requirement.ticker or "not supplied, will search",
+            )
             data_point = self._find_matching_fiscal_year(requirement)
             if data_point is None:
+                logger.info(
+                    "yfinance found no matching data for ticker=%s "
+                    "('%s').",
+                    requirement.ticker,
+                    requirement.name,
+                )
                 continue
+
+            logger.info(
+                "yfinance found %s = %s %s %s for %s (%s), fiscal year "
+                "ended %s.",
+                data_point.metric_name,
+                data_point.value,
+                data_point.unit,
+                data_point.currency,
+                data_point.ticker,
+                data_point.company_name,
+                data_point.fiscal_period_end,
+            )
 
             source = SourceRecord(
                 workflow_id=workflow_id,
@@ -184,11 +252,34 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                 reported_value=data_point.value,
                 currency=data_point.currency,
                 unit=data_point.unit,
-                reporting_period=str(data_point.fiscal_period_end),
+                # "FY{year}" matches the convention every other evidence
+                # record in this project already uses (see the "annual"
+                # branch of the validator's period-granularity check).
+                # The exact fiscal-period-end date is still preserved
+                # in `content` above for precision; this field only
+                # needs to say which fiscal year, consistently with
+                # how web-sourced evidence already labels the same
+                # thing, so the two can be compared without a false
+                # "incompatible granularity" rejection.
+                reporting_period=f"FY{data_point.fiscal_period_end.year}",
             )
 
             new_sources.append(source)
             new_evidence.append(record)
+
+        if new_evidence:
+            logger.info(
+                "Financial Analysis Agent: yfinance filled %d of %d "
+                "evidence gap(s).",
+                len(new_evidence),
+                len(gaps),
+            )
+        else:
+            logger.info(
+                "Financial Analysis Agent: %d evidence gap(s) found, "
+                "yfinance did not fill any of them.",
+                len(gaps),
+            )
 
         return new_evidence, new_sources
 
@@ -229,15 +320,27 @@ class FinancialAnalysisAgent(ToolCallingAgent):
         a requested year even when it is no longer the most recent one
         available.
         """
+        if requirement.candidate_name is None:
+            return None
 
-        if requirement.ticker is None:
+        # Prefer the ticker the research plan already supplied. Only
+        # fall back to a live search when it's missing, and never
+        # write the result back onto `requirement` — that object is
+        # shared with the rest of the workflow (it lives inside
+        # research_plan.evidence_requirements), and this is a lookup,
+        # not something that should silently rewrite the plan.
+        ticker = requirement.ticker
+        if ticker is None:
+            ticker = self._resolve_ticker(requirement.candidate_name)
+
+        if ticker is None:
             return None
 
         requested_year = self._extract_year(requirement)
 
         for period_offset in range(self._MAX_FISCAL_YEAR_LOOKBACK):
             data_point = self._fill_data.fetch_metric(
-                ticker=requirement.ticker,
+                ticker=ticker,
                 metric_name=requirement.name,
                 period_offset=period_offset,
             )
@@ -253,3 +356,36 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                 return data_point
 
         return None
+
+    @staticmethod
+    def _resolve_ticker(company_name: str) -> str | None:
+        """Look up a ticker symbol for a company name, as a fallback.
+
+        Only used when the research plan didn't supply a ticker
+        directly. yfinance is an unofficial wrapper around Yahoo's
+        endpoints and can fail for reasons unrelated to whether a
+        match exists (network errors, upstream changes, rate
+        limiting), so any failure is treated the same as a genuine
+        "no match found" rather than raised.
+        """
+
+        try:
+            result = yfinance.Search(company_name, max_results=1)
+        except Exception:
+            logger.info(
+                "Ticker search failed for '%s'; leaving as a gap.",
+                company_name,
+            )
+            return None
+
+        if not result.quotes:
+            logger.info("No ticker found for '%s'.", company_name)
+            return None
+
+        ticker = result.quotes[0].get("symbol")
+        logger.info(
+            "Resolved ticker for '%s' via search: %s.",
+            company_name,
+            ticker,
+        )
+        return ticker

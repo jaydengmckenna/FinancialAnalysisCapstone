@@ -1,10 +1,27 @@
 """Application entry point for the current research workflow."""
 
+from fin_automation.config import get_settings
+from fin_automation.logging_config import (
+    configure_logging,
+    next_available_log_path,
+)
 from fin_automation.workflow.orchestrator import ResearchOrchestrator
 
 
 def main() -> None:
     """Prompt for a research request and hand it to the orchestrator."""
+
+    settings = get_settings()
+    log_directory = settings.output_directory / "logs"
+    log_file = next_available_log_path(log_directory)
+    configure_logging(
+        secrets=[
+            settings.openai_api_key.get_secret_value(),
+            settings.tavily_api_key.get_secret_value(),
+        ],
+        log_file=log_file,
+    )
+    print(f"Logging this run to: {log_file}")
 
     raw_user_req = input("Enter a research request: ").strip()
 
