@@ -315,3 +315,84 @@ def test_orchestrator_executes_full_phase_9_pipeline() -> None:
     assert orchestrator.last_report_draft is not None
     assert orchestrator.last_report_artifact is not None
 
+
+def _growth_calculation(*, value: str, candidate="Example Inc") -> CalculatedMetric:
+    return CalculatedMetric(
+        workflow_id=uuid4(),
+        operation="growth_rate",
+        metric_name="revenue growth",
+        candidate_names=[candidate],
+        value=Decimal(value),
+        unit="percent",
+        currency="USD",
+        input_evidence_ids=[uuid4(), uuid4()],
+        formula="((current - prior) / prior) * 100",
+        reporting_periods=["FY2023", "FY2024"],
+    )
+
+
+def test_score_financial_performance_rewards_strong_growth() -> None:
+    score = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="126.39")],
+        candidate_name="Example Inc",
+    )
+
+    assert score == Decimal("95")
+
+
+def test_score_financial_performance_penalizes_decline() -> None:
+    score = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="-43.53")],
+        candidate_name="Example Inc",
+    )
+
+    assert score == Decimal("15")
+
+
+def test_score_financial_performance_differs_by_growth_band() -> None:
+    strong = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="60")],
+        candidate_name="Example Inc",
+    )
+    modest = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="2.09")],
+        candidate_name="Example Inc",
+    )
+    mild_decline = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="-5")],
+        candidate_name="Example Inc",
+    )
+
+    assert strong > modest > mild_decline
+
+
+def test_score_financial_performance_ignores_other_candidates_calculation() -> None:
+    score = ResearchOrchestrator._score_financial_performance(
+        calculations=[_growth_calculation(value="126.39", candidate="Other Inc")],
+        candidate_name="Example Inc",
+    )
+
+    assert score == ResearchOrchestrator._NO_GROWTH_RATE_SCORE
+
+
+def test_score_financial_performance_neutral_for_non_percent_operation() -> None:
+    calculation = CalculatedMetric(
+        workflow_id=uuid4(),
+        operation="difference",
+        metric_name="revenue difference",
+        candidate_names=["Example Inc"],
+        value=Decimal("36.70"),
+        unit="billion",
+        currency="USD",
+        input_evidence_ids=[uuid4(), uuid4()],
+        formula="first - second",
+        reporting_periods=["FY2024"],
+    )
+
+    score = ResearchOrchestrator._score_financial_performance(
+        calculations=[calculation],
+        candidate_name="Example Inc",
+    )
+
+    assert score == ResearchOrchestrator._NO_GROWTH_RATE_SCORE
+

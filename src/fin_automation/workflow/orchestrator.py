@@ -17,12 +17,11 @@ from fin_automation.config import get_settings
 from fin_automation.exceptions import WorkflowError
 from fin_automation.models.common import (
     AnalysisStatus,
+    CalculationOperation,
     ConfidenceLevel,
     DataAvailabilityStatus,
     RecommendationOutcome,
-    ReportType,
     SearchPurpose,
-    SourceCategory,
     WorkflowStage,
 )
 from fin_automation.models.financial import (
@@ -500,6 +499,15 @@ class ResearchOrchestrator:
                 in {name.casefold() for name in calculation.candidate_names}
             ]
 
+            performance_score = (
+                self._score_financial_performance(
+                    calculations=calculations,
+                    candidate_name=candidate_name,
+                )
+                if calc_ids
+                else None
+            )
+
             category = CategoryEvaluation(
                 workflow_id=research_plan.workflow_id,
                 candidate_name=candidate_name,
@@ -509,7 +517,7 @@ class ResearchOrchestrator:
                     if calc_ids and supporting_evidence
                     else DataAvailabilityStatus.MISSING
                 ),
-                score=Decimal("75") if calc_ids else None,
+                score=performance_score,
                 calculation_ids=calc_ids,
                 supporting_evidence_ids=supporting_evidence,
                 opposing_evidence_ids=[],
@@ -539,13 +547,68 @@ class ResearchOrchestrator:
                     opposing_evidence_ids=[],
                     missing_information=[],
                     unresolved_conflicts=[],
-                    weighted_score=Decimal("75") if calc_ids else None,
+                    weighted_score=performance_score,
                     confidence=category.confidence,
                     rationale="The candidate was evaluated using available workflow evidence.",
                 )
             )
 
         return analyses
+
+    # Deliberately simple, project-defined bands rather than a
+    # universal financial rule (see specs/recommendation-methodology.md
+    # section 7) — the goal is a score that reflects what was actually
+    # calculated instead of a fixed placeholder, not a rigorous
+    # valuation model.
+    _GROWTH_SCORE_BANDS: tuple[tuple[Decimal, Decimal], ...] = (
+        (Decimal("50"), Decimal("95")),
+        (Decimal("15"), Decimal("80")),
+        (Decimal("0"), Decimal("60")),
+        (Decimal("-15"), Decimal("35")),
+    )
+    _GROWTH_SCORE_FLOOR = Decimal("15")
+    _NO_GROWTH_RATE_SCORE = Decimal("50")
+
+    @classmethod
+    def _score_financial_performance(
+        cls,
+        calculations: list[CalculatedMetric],
+        candidate_name: str,
+    ) -> Decimal:
+        """Score a candidate from its own calculated growth rate.
+
+        Reflects what was actually found for this candidate instead of
+        a fixed placeholder, so two candidates with different results
+        don't show the same score. Only a `growth_rate` calculation
+        expressed as a percent is used — margin, ratio, and difference
+        results aren't on a "higher is better growth" scale, so
+        applying growth bands to them would be meaningless; a neutral
+        score is used instead of guessing at those.
+        """
+
+        growth_rate = next(
+            (
+                calculation.value
+                for calculation in calculations
+                if calculation.operation == CalculationOperation.GROWTH_RATE
+                and calculation.unit == "percent"
+                and candidate_name.casefold()
+                in {
+                    name.casefold()
+                    for name in calculation.candidate_names
+                }
+            ),
+            None,
+        )
+
+        if growth_rate is None:
+            return cls._NO_GROWTH_RATE_SCORE
+
+        for threshold, score in cls._GROWTH_SCORE_BANDS:
+            if growth_rate >= threshold:
+                return score
+
+        return cls._GROWTH_SCORE_FLOOR
 
     def _default_recommendation(
         self,
@@ -869,15 +932,25 @@ class ResearchOrchestrator:
 
         research_plan = self.run_intake_and_plan(original_prompt)
         source_selection = self.run_source_selection(research_plan)
+        source_records: list[SourceRecord] = []
+        evidence_records: list[ExtractedEvidence] = []
         for attempt in range(2):
             (
-                source_records,
-                evidence_records,
+                round_source_records,
+                round_evidence_records,
                 evidence_gaps,
             ) = self.run_extract_evidence(
                 source_selection=source_selection,
                 research_plan=research_plan,
             )
+            # A retry targets a specific validation finding or gap, not
+            # a restart, so evidence already gathered (and, for
+            # anything the model already accepted, already valid) in
+            # an earlier round must carry forward rather than being
+            # discarded when this round only re-searches for what's
+            # still missing.
+            source_records = source_records + round_source_records
+            evidence_records = evidence_records + round_evidence_records
             (
                 calculations,
                 _,

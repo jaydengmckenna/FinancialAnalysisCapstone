@@ -2,9 +2,17 @@
 
 ## Project Status
 
-Phase 5, the simplified Phase 6 financial-analysis slice, and Phase 7
-evidence validation are complete. Phase 8 is focused on generating one
-validated Markdown report for human review.
+Phases 1 through 8 are complete. Phase 9 (Complete Product Workflow) has
+connected intake, research planning, source selection, evidence
+extraction, financial calculation, evidence validation, and report
+writing into one working end-to-end product: a natural-language
+research request produces a validated Markdown report in `outputs/`.
+A deterministic `FinancialDataTool` (yfinance-backed) fills numeric
+evidence gaps that web search alone cannot reliably find. One Phase 9
+deliverable — formal `WorkflowState`/`StageResult` tracking and routed
+analysis-correction behavior — remains an open scope decision; see
+`constitution/roadmap.md` for details. Phase 10 (testing and quality
+verification) has not started.
 
 ## Purpose
 
@@ -73,6 +81,54 @@ User request
 	-> validated Markdown report
 	-> human review
 ```
+
+## Example Prompt and Interpreting a Report
+
+A prompt that works well with the current implementation names one
+candidate, one metric, and specific fiscal years:
+
+```text
+What is Microsoft's fiscal-year revenue growth from FY2023 to FY2024
+based on total revenue in USD billions, and what qualified research
+conclusion can be drawn for a high-risk, long-term growth investor?
+```
+
+Open-ended prompts (e.g. "is this a good investment based on its
+current financials and trajectory") still work, but tend to pull in a
+wider, messier mix of quarterly figures, forecasts, and price targets,
+which makes an inconclusive result more likely.
+
+Before acting on any generated report:
+
+- **`qualified_recommendation` means a calculation was completed and
+  passed validation — it does not mean the result is favorable.** The
+  system does not currently score a calculated decline differently
+  from a calculated increase; check the actual value and its sign in
+  the Candidate Analyses section yourself.
+- **`insufficient_evidence` means no verified calculation could be
+  completed**, even if the underlying sources clearly lean one
+  direction. The system will not turn a qualitative impression (a
+  headline, a pre-computed percentage from an uninspected source)
+  into a recommendation on its own.
+- **Check which periods were actually compared.** The Research
+  Methodology and Candidate Analyses sections state the exact fiscal
+  years or periods used. Confirm they match what you asked for.
+- **Treat a "difference" calculation with extra caution.** Most
+  calculations are growth rates (a percentage). If a report instead
+  shows a raw dollar "difference" for a single candidate, and the two
+  periods look the same, that indicates conflicting source data
+  rather than a real trend.
+- **Verify the cited sources directly.** Every report links its
+  sources (SEC filings, investor relations pages, annual reports).
+  Open them and confirm the cited figures match before relying on the
+  report.
+- **Re-run the prompt if a result looks off.** Web search and
+  extraction are not fully deterministic; the same prompt run twice
+  can return different source coverage.
+
+Every report ends with a mandatory Human Review section. This is not
+boilerplate — no report from this system is a final investment
+decision.
 
 ## Repository Guide
 

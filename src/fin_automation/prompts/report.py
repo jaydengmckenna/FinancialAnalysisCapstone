@@ -63,6 +63,12 @@ Instructions:
     accepted it.
 14. Do not generate report_draft_id or created_at in the payload. The
     application generates those fields.
+15. For each candidate with a non-null `weighted_score` in
+    `candidate_analyses`, state that exact numeric value explicitly in
+    the Candidate Analyses section alongside its confidence level (for
+    example, "Confidence level: Moderate" / "Score: 80"). Use the
+    supplied number as-is; do not compute, round, or invent a score.
+    Omit the score line only when `weighted_score` is null.
 """.strip()
 
 

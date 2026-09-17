@@ -61,28 +61,34 @@ The roadmap uses the following statuses:
 | Phase 6: Simplified Financial Analysis Slice | Completed |
 | Phase 7: Evidence Validation and Safety | Completed |
 | Phase 8: Markdown Report Generation | Completed |
-| Phase 9: Complete Product Workflow | In Progress |
+| Phase 9: Complete Product Workflow | Completed |
 | Phase 10: Testing and Quality Verification | Not Started |
 | Phase 11: Documentation and Submission Preparation | Not Started |
 
 ## Current Focus
 
-Phase 9: Complete Product Workflow is functionally working end to end:
-a natural-language request now runs through intake, research planning,
-source selection, evidence extraction, financial calculation, evidence
-validation, and report writing, and produces a validated Markdown report
+Phase 9: Complete Product Workflow is complete. A natural-language
+request runs end to end through intake, research planning, source
+selection, evidence extraction, financial calculation, evidence
+validation, and report writing, producing a validated Markdown report
 in the approved output directory. Three of the five agents (Source
 Selection, Financial Analysis, Report Writing) call their own tools
 directly rather than being driven by deterministic Python after the
-fact.
+fact. A deterministic `FinancialDataTool` (yfinance-backed) fills
+numeric evidence gaps that live web search alone could not reliably
+find, verified across multiple companies and both the "fallback
+needed" and "fallback not needed" paths.
 
-Phase 9 is not yet marked Completed. Two things remain open, detailed in
-the Phase 9 section below: evidence extraction does not yet reliably
-retrieve real financial figures from live sources (every live run so
-far has produced a correctly-formed insufficient-evidence report rather
-than a qualified recommendation), and the formal `WorkflowState`/
-`StageResult` failure-handling machinery has not been built and may be
-descoped rather than implemented, pending further review.
+One Phase 9 deliverable — the formal `WorkflowState`/`StageResult`
+contracts and routing corrections through `ValidationCorrectionRouter`
+— was formally descoped rather than implemented, after review
+determined the current bounded-retry-then-stop behavior is safe
+(conservative, not unsafe) and that building it would mean
+restructuring the orchestrator's control flow this late in the
+project. See `docs/design-tradeoffs.md` for the full reasoning behind
+this and the other scope decisions made while closing out Phase 9.
+
+The current focus is now Phase 10: Testing and Quality Verification.
 
 ---
 
@@ -1657,7 +1663,8 @@ Phase 8 depends on completion of Phase 7.
 
 ### Status
 
-In Progress
+Completed. One deliverable (analysis-correction routing) was formally
+descoped rather than implemented — see `docs/design-tradeoffs.md`.
 
 ### Goal
 
@@ -1696,42 +1703,64 @@ mislabeled a different year's figure under the requested year's label;
 it now searches back through recent fiscal years for the one actually
 requested).
 
-One thing remains open before Phase 9 can be marked Completed:
+One item was formally decided rather than implemented before Phase 9
+was marked Completed:
 
 - The formal `WorkflowState`/`StageResult` contracts defined in Phase 4,
   the "Analysis correction behavior" deliverable, and consuming the
-  existing `ValidationCorrectionRouter` to route corrections, are not
-  implemented. The orchestrator currently tracks ad-hoc `last_*`
-  instance attributes instead of building those formal contracts, and a
-  validation outcome of `analysis_correction_required` currently
-  receives the same treatment as an outright rejection (the workflow
-  stops) rather than a distinct bounded correction path. Whether to
-  implement this or descope it from Phase 9 given time constraints is
-  an open decision that has not yet been made.
+  existing `ValidationCorrectionRouter` to route corrections, were not
+  implemented. The orchestrator tracks ad-hoc `last_*` instance
+  attributes instead of building those formal contracts, and a
+  validation outcome of `analysis_correction_required` receives the
+  same treatment as an outright rejection (the workflow stops) rather
+  than a distinct bounded correction path. This was reviewed and
+  descoped rather than left open — see `docs/design-tradeoffs.md` for
+  the full reasoning.
+
+Since this status was last updated, further QA passes also found and
+fixed: evidence gathered in one research-retry round being silently
+discarded on the next round; evidence coverage checks accepting
+percentages and wrong-period data as if they satisfied a dollar-figure
+requirement (both of which blocked the `FinancialDataTool` fallback
+from engaging when it should have); a citation-matching false rejection
+caused by sentence-final punctuation attaching to the last word of a
+claim; and a fixed, non-varying `financial_performance` score that
+showed identically for every result regardless of the calculated
+value. `main.py` now also catches `WorkflowError` and prints a clear
+message instead of an unhandled traceback. All are covered by
+regression tests.
 
 ### Planned Deliverables
 
 - [x] Complete orchestrator implementation.
-- [ ] `WorkflowState` implementation. Not started; open scope decision.
-- [ ] Stage-result tracking. Not started; open scope decision.
+- [ ] `WorkflowState` implementation. Descoped — see
+      `docs/design-tradeoffs.md`.
+- [ ] Stage-result tracking. Descoped — see `docs/design-tradeoffs.md`.
 - [x] Agent and tool assignments.
 - [x] Intake clarification behavior.
 - [x] Research retry behavior.
-- [ ] Analysis correction behavior. Not started; open scope decision.
+- [ ] Analysis correction behavior. Descoped — see
+      `docs/design-tradeoffs.md`.
 - [ ] Validation routing. `ValidationCorrectionRouter` exists (Phase 7)
-      but is not consumed by the orchestrator; open scope decision.
+      but is not consumed by the orchestrator; descoped — see
+      `docs/design-tradeoffs.md`.
 - [x] Markdown report handoff and output-path handling.
 - [x] Bounded retry and correction limits, for model-call retries and
-      the additional-research loop. Not yet true for an
-      analysis-correction-required outcome, since that behavior does
-      not exist yet.
-- [ ] Structured workflow failure handling. `WorkflowError` is raised
-      when retries are exhausted but nothing catches it yet, and there
-      is no formal `WorkflowState` result; open scope decision.
-- [x] Example end-to-end execution. `outputs/report1.md` through
-      `report4.md` reached a validated `insufficient_evidence` outcome;
-      `outputs/report5.md` reached a genuine `qualified_recommendation`
-      with a correct calculated growth rate and real citations.
+      the additional-research loop. Not true for an
+      analysis-correction-required outcome, since that path was
+      descoped rather than built.
+- [x] Structured workflow failure handling. `WorkflowError` is raised
+      when retries are exhausted and is now caught in `main.py`,
+      which prints a clear message and exits rather than propagating
+      an unhandled traceback. There is still no formal `WorkflowState`
+      result (descoped — see `docs/design-tradeoffs.md`), but the
+      failure itself is handled structurally, not silently.
+- [x] Example end-to-end execution. Verified live across multiple
+      companies (NVIDIA, Apple, Chewy, Build-A-Bear, National Presto
+      Industries, Nike, Microsoft) with both `qualified_recommendation`
+      and `insufficient_evidence` outcomes, and with the
+      `FinancialDataTool` fallback confirmed engaging correctly when
+      needed and staying out of the way when it isn't.
 - [x] Product smoke test (`run_smoke_test.py`).
 
 ### Planned Workflow
@@ -1764,18 +1793,25 @@ Phase 9 is complete when:
 - [x] Failed required stages prevent invalid downstream processing.
 - [x] Required clarification stops research until resolved.
 - [x] Recoverable failures use bounded correction paths, for model-call
-      retries and the additional-research loop. Not yet true for an
-      analysis-correction-required validation outcome.
-- [ ] Unrecoverable failures produce structured errors. `WorkflowError`
-      exists and is raised, but nothing catches it yet, and there is no
-      formal `WorkflowState` result.
+      retries and the additional-research loop. Not true for an
+      analysis-correction-required validation outcome, since targeted
+      per-stage correction routing was descoped — see
+      `docs/design-tradeoffs.md`.
+- [x] Unrecoverable failures produce structured errors. `WorkflowError`
+      is raised when retries are exhausted, and `main.py` now catches
+      it and prints a clear message instead of an unhandled traceback.
+      There is still no formal `WorkflowState` result (descoped — see
+      `docs/design-tradeoffs.md`), but the failure is handled
+      structurally, not silently.
 - [x] Only validated results proceed to report generation.
 - [x] A complete research request produces a validated Markdown report
       in the approved output directory.
 - [x] The workflow does not execute any financial transaction.
 - [x] The product returns the report path and a status summary for
-      human review, printed by `main.py`. Not yet a formal
-      `WorkflowState` object.
+      human review, printed by `main.py`. Not a formal `WorkflowState`
+      object (descoped — see `docs/design-tradeoffs.md`), but a clear
+      status is always returned, including on an unrecoverable
+      failure.
 - [x] The bounded product smoke test passes.
 
 ### Dependencies
@@ -2053,21 +2089,24 @@ Roadmap updates shall follow these rules:
 | 0.3 | Phases 2 and 3 | Completed detailed specifications and began data-contract and architecture design. | Phase 2 deliverables and exit criteria were satisfied. |
 | 0.4 | Phases 3 and 4 | Completed data contracts, agent workflows, architecture documentation, and the architecture diagram. Began project setup and Pydantic implementation. | Phase 3 deliverables and exit criteria were satisfied. |
 | 0.5 | Phases 5 through 8 | Refined future implementation phases to match the approved five-agent architecture and reduced financial tool set. | Phase 3 clarified the actual component boundaries, contracts, tools, and outputs. |
+| 0.6 | Phase 9 | Marked Phase 9 Completed. Fixed evidence-retry accumulation, evidence-coverage checks (percentage and wrong-period data), a citation tokenizer false rejection, and a fixed non-varying candidate score; added `WorkflowError` handling in `main.py`; formally descoped `WorkflowState`/`StageResult`/`ValidationCorrectionRouter` integration. | Live QA passes on 2026-09-17 found and resolved the remaining defects blocking a genuine `qualified_recommendation`, and the remaining open Phase 9 item needed a documented decision rather than staying open indefinitely. See `docs/design-tradeoffs.md`. |
 
 ## Next Planned Work
 
 The active phase is:
 
 ```text
-Phase 4: Project Structure and Development Environment
+Phase 10: Testing and Quality Verification
 ```
 
 The first implementation work will be:
 
-1. Create the approved repository directories.
-2. Create `requirements.txt`.
-3. Create `.env.example`.
-4. Create `.gitignore`.
-5. Create the Python source package.
-6. Implement shared enums and intake Pydantic models.
-7. Write and run the initial model tests.
+1. Build the unit-test, happy-path, failure-path, and adversarial
+   suites described in the Phase 10 section below.
+2. Map major functional requirements to specific tests or acceptance
+   checks.
+3. Mock external dependencies (OpenAI, Tavily, yfinance) so the suite
+   is repeatable without live API calls.
+4. Save fixtures supporting repeatable scraping tests.
+5. Record test results as a project artifact and complete the final
+   acceptance review.

@@ -190,82 +190,131 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                     requirement.candidate_name or "unknown candidate",
                 )
                 continue
-            logger.info(
-                "Financial Analysis Agent: falling back to yfinance for "
-                "'%s' — candidate=%s, ticker=%s.",
-                requirement.name,
-                requirement.candidate_name or "unknown candidate",
-                requirement.ticker or "not supplied, will search",
-            )
-            data_point = self._find_matching_fiscal_year(requirement)
-            if data_point is None:
+
+            if requirement.candidate_name is None:
                 logger.info(
-                    "yfinance found no matching data for ticker=%s "
-                    "('%s').",
-                    requirement.ticker,
+                    "Evidence gap '%s' has no candidate name; yfinance "
+                    "cannot look it up, leaving as a gap.",
                     requirement.name,
                 )
                 continue
 
+            # Prefer the ticker the research plan already supplied.
+            # Only fall back to a live search when it's missing, and
+            # never write the result back onto `requirement` — that
+            # object is shared with the rest of the workflow (it lives
+            # inside research_plan.evidence_requirements), and this is
+            # a lookup, not something that should silently rewrite the
+            # plan.
+            ticker = requirement.ticker
+            if ticker is None:
+                ticker = self._resolve_ticker(requirement.candidate_name)
+            if ticker is None:
+                logger.info(
+                    "No ticker available for '%s' (%s); yfinance cannot "
+                    "help, leaving as a gap.",
+                    requirement.name,
+                    requirement.candidate_name,
+                )
+                continue
+
+            # A requirement can mention more than one year at once (a
+            # combined "growth from FY2022 to FY2023" requirement, not
+            # two separate ones), and existing evidence may already
+            # cover some of those years correctly. Only fetch the
+            # years still missing, so a single wrong/incomplete year
+            # doesn't cause yfinance to re-fetch data already on hand.
+            requested_years = self._extract_years(requirement)
+            covered_years = self._covered_years(requirement, evidence)
+            missing_years = [
+                year for year in requested_years if year not in covered_years
+            ] or [None]
+
             logger.info(
-                "yfinance found %s = %s %s %s for %s (%s), fiscal year "
-                "ended %s.",
-                data_point.metric_name,
-                data_point.value,
-                data_point.unit,
-                data_point.currency,
-                data_point.ticker,
-                data_point.company_name,
-                data_point.fiscal_period_end,
+                "Financial Analysis Agent: falling back to yfinance for "
+                "'%s' — candidate=%s, ticker=%s, year(s) needed=%s.",
+                requirement.name,
+                requirement.candidate_name,
+                ticker,
+                missing_years if requested_years else "most recent",
             )
 
-            source = SourceRecord(
-                workflow_id=workflow_id,
-                search_result_id=uuid4(),
-                title=f"{data_point.company_name} — Yahoo Finance Financials",
-                url=AnyHttpUrl(data_point.source_url),
-                retrieval_date=date.today(),
-                source_category=SourceCategory.SECONDARY,
-                parsing_status=ParsingStatus.SUCCESS,
-                candidate_names=(
-                    [requirement.candidate_name]
-                    if requirement.candidate_name
-                    else []
-                ),
-                evidence_requirement_ids=[requirement.requirement_id],
-                content_summary=(
-                    f"{data_point.metric_name} from Yahoo Finance."
-                ),
-            )
-            record = ExtractedEvidence(
-                workflow_id=workflow_id,
-                source_id=source.source_id,
-                candidate_name=requirement.candidate_name,
-                evidence_requirement_id=requirement.requirement_id,
-                evidence_type="financial_metric",
-                content=(
-                    f"{data_point.company_name} reported "
-                    f"{data_point.metric_name} of {data_point.value} "
-                    f"{data_point.unit} {data_point.currency} for the "
-                    f"fiscal period ended {data_point.fiscal_period_end}."
-                ),
-                reported_value=data_point.value,
-                currency=data_point.currency,
-                unit=data_point.unit,
-                # "FY{year}" matches the convention every other evidence
-                # record in this project already uses (see the "annual"
-                # branch of the validator's period-granularity check).
-                # The exact fiscal-period-end date is still preserved
-                # in `content` above for precision; this field only
-                # needs to say which fiscal year, consistently with
-                # how web-sourced evidence already labels the same
-                # thing, so the two can be compared without a false
-                # "incompatible granularity" rejection.
-                reporting_period=f"FY{data_point.fiscal_period_end.year}",
-            )
+            for target_year in missing_years:
+                data_point = self._find_data_point_for_year(
+                    requirement=requirement,
+                    ticker=ticker,
+                    target_year=target_year,
+                )
+                if data_point is None:
+                    logger.info(
+                        "yfinance found no matching data for ticker=%s, "
+                        "year=%s ('%s').",
+                        ticker,
+                        target_year,
+                        requirement.name,
+                    )
+                    continue
 
-            new_sources.append(source)
-            new_evidence.append(record)
+                logger.info(
+                    "yfinance found %s = %s %s %s for %s (%s), fiscal "
+                    "year ended %s.",
+                    data_point.metric_name,
+                    data_point.value,
+                    data_point.unit,
+                    data_point.currency,
+                    data_point.ticker,
+                    data_point.company_name,
+                    data_point.fiscal_period_end,
+                )
+
+                source = SourceRecord(
+                    workflow_id=workflow_id,
+                    search_result_id=uuid4(),
+                    title=(
+                        f"{data_point.company_name} — "
+                        "Yahoo Finance Financials"
+                    ),
+                    url=AnyHttpUrl(data_point.source_url),
+                    retrieval_date=date.today(),
+                    source_category=SourceCategory.SECONDARY,
+                    parsing_status=ParsingStatus.SUCCESS,
+                    candidate_names=[requirement.candidate_name],
+                    evidence_requirement_ids=[requirement.requirement_id],
+                    content_summary=(
+                        f"{data_point.metric_name} from Yahoo Finance."
+                    ),
+                )
+                record = ExtractedEvidence(
+                    workflow_id=workflow_id,
+                    source_id=source.source_id,
+                    candidate_name=requirement.candidate_name,
+                    evidence_requirement_id=requirement.requirement_id,
+                    evidence_type="financial_metric",
+                    content=(
+                        f"{data_point.company_name} reported "
+                        f"{data_point.metric_name} of {data_point.value} "
+                        f"{data_point.unit} {data_point.currency} for "
+                        f"the fiscal period ended "
+                        f"{data_point.fiscal_period_end}."
+                    ),
+                    reported_value=data_point.value,
+                    currency=data_point.currency,
+                    unit=data_point.unit,
+                    # "FY{year}" matches the convention every other
+                    # evidence record in this project already uses (see
+                    # the "annual" branch of the validator's
+                    # period-granularity check). The exact
+                    # fiscal-period-end date is still preserved in
+                    # `content` above for precision; this field only
+                    # needs to say which fiscal year, consistently with
+                    # how web-sourced evidence already labels the same
+                    # thing, so the two can be compared without a false
+                    # "incompatible granularity" rejection.
+                    reporting_period=f"FY{data_point.fiscal_period_end.year}",
+                )
+
+                new_sources.append(source)
+                new_evidence.append(record)
 
         if new_evidence:
             logger.info(
@@ -283,60 +332,124 @@ class FinancialAnalysisAgent(ToolCallingAgent):
 
         return new_evidence, new_sources
 
+    @staticmethod
     def _is_covered(
-        self,
         requirement: EvidenceRequirement,
         evidence: list[ExtractedEvidence],
     ) -> bool:
-        """Return whether any extracted evidence satisfies this requirement."""
+        """Return whether extracted evidence satisfies this requirement.
 
-        return any(
-            record.evidence_requirement_id == requirement.requirement_id
-            for record in evidence
+        A matching requirement_id alone isn't enough:
+
+        - A metric like revenue or gross profit growth needs a
+          currency-denominated dollar value to calculate from.
+          Evidence expressed only as a percentage or ratio (margin,
+          growth rate, etc.) can't be used as that input even though
+          it's tagged to the right requirement.
+        - If the requirement asks about specific year(s) (e.g. "FY2022
+          to FY2023"), evidence for a *different* year (a quarterly
+          figure, or the wrong fiscal year) doesn't answer the
+          question either, even though it may be a perfectly valid
+          dollar amount for its own period.
+
+        Both are checked via `_qualifying_records`/`_covered_years`
+        rather than accepting the first matching-ID record found,
+        since either kind of mismatch would otherwise silently block
+        the yfinance fallback from supplying the actual right number.
+        """
+
+        qualifying = FinancialAnalysisAgent._qualifying_records(
+            requirement, evidence
         )
+        if not qualifying:
+            return False
+
+        requested_years = FinancialAnalysisAgent._extract_years(requirement)
+        if not requested_years:
+            return True
+
+        covered_years = FinancialAnalysisAgent._covered_years(
+            requirement, evidence
+        )
+        return all(year in covered_years for year in requested_years)
 
     @staticmethod
-    def _extract_year(requirement: EvidenceRequirement) -> int | None:
-        """Pull the 4-digit year mentioned in a requirement's text, if any."""
+    def _qualifying_records(
+        requirement: EvidenceRequirement,
+        evidence: list[ExtractedEvidence],
+    ) -> list[ExtractedEvidence]:
+        """Evidence tagged to this requirement that is a usable dollar value."""
 
-        match = re.search(
-            r"20\d{2}",
-            f"{requirement.name} {requirement.description}",
+        return [
+            record
+            for record in evidence
+            if record.evidence_requirement_id == requirement.requirement_id
+            and record.currency is not None
+            and not FinancialAnalysisAgent._is_percentage_unit(record.unit)
+        ]
+
+    @staticmethod
+    def _covered_years(
+        requirement: EvidenceRequirement,
+        evidence: list[ExtractedEvidence],
+    ) -> set[int]:
+        """Years already backed by a qualifying evidence record."""
+
+        return {
+            year
+            for record in FinancialAnalysisAgent._qualifying_records(
+                requirement, evidence
+            )
+            for year in FinancialAnalysisAgent._years_in_text(
+                record.reporting_period or ""
+            )
+        }
+
+    @staticmethod
+    def _is_percentage_unit(unit: str | None) -> bool:
+        """Return whether a unit string describes a percentage or ratio."""
+
+        if unit is None:
+            return False
+
+        normalized = unit.casefold()
+        return "%" in normalized or "percent" in normalized
+
+    @staticmethod
+    def _years_in_text(text: str) -> list[int]:
+        """Return every distinct 4-digit year mentioned in text, in order."""
+
+        years: list[int] = []
+        for match in re.findall(r"20\d{2}", text):
+            year = int(match)
+            if year not in years:
+                years.append(year)
+        return years
+
+    @staticmethod
+    def _extract_years(requirement: EvidenceRequirement) -> list[int]:
+        """Pull every distinct year mentioned in a requirement's text."""
+
+        return FinancialAnalysisAgent._years_in_text(
+            f"{requirement.name} {requirement.description}"
         )
-        return int(match.group()) if match else None
 
-    def _find_matching_fiscal_year(
+    def _find_data_point_for_year(
         self,
         requirement: EvidenceRequirement,
+        ticker: str,
+        target_year: int | None,
     ) -> FinancialDataPoint | None:
-        """Search recent fiscal years for the one a requirement asks for.
+        """Search recent fiscal years for one specific year of data.
 
         Tries the most recently completed fiscal year first, then
         works backward, until it finds a fiscal year whose end date
-        falls in the year the requirement's text mentions. If the
-        requirement doesn't mention a specific year at all, the most
+        falls in `target_year`. If `target_year` is None, the most
         recently completed fiscal year is used directly. Searching
         (rather than guessing a single offset) is what lets this find
         a requested year even when it is no longer the most recent one
         available.
         """
-        if requirement.candidate_name is None:
-            return None
-
-        # Prefer the ticker the research plan already supplied. Only
-        # fall back to a live search when it's missing, and never
-        # write the result back onto `requirement` — that object is
-        # shared with the rest of the workflow (it lives inside
-        # research_plan.evidence_requirements), and this is a lookup,
-        # not something that should silently rewrite the plan.
-        ticker = requirement.ticker
-        if ticker is None:
-            ticker = self._resolve_ticker(requirement.candidate_name)
-
-        if ticker is None:
-            return None
-
-        requested_year = self._extract_year(requirement)
 
         for period_offset in range(self._MAX_FISCAL_YEAR_LOOKBACK):
             data_point = self._fill_data.fetch_metric(
@@ -349,10 +462,10 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                 # point on; further offsets would fail too.
                 return None
 
-            if requested_year is None:
+            if target_year is None:
                 return data_point
 
-            if data_point.fiscal_period_end.year == requested_year:
+            if data_point.fiscal_period_end.year == target_year:
                 return data_point
 
         return None

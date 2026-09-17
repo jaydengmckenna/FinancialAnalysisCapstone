@@ -210,6 +210,34 @@ def validate_with_claim(context: dict[str, object], claim: ValidationClaim):
     )
 
 
+def test_text_supported_ignores_trailing_sentence_period() -> None:
+    """Regression: a claim's sentence-final period must not glue onto
+    its last word and prevent it from matching the same word appearing
+    mid-sentence in the cited evidence. A live Nike run showed this
+    exact failure: the claim's "for 2026." tokenized as "2026." while
+    the evidence's "for 2026 was" tokenized as "2026", so a real,
+    correct citation was rejected over one stray period."""
+
+    claim = "Nike reported 3.108 billion USD for 2026."
+    evidence = "NIKE annual net income for 2026 was $3.108B, a 3.45% decline from 2025."
+
+    assert EvidenceValidationService._text_supported(claim, evidence) is True
+
+
+def test_text_supported_still_matches_decimal_numbers() -> None:
+    claim = "Alpha revenue was 10.00 percent higher."
+    evidence = "Alpha reported revenue growth of 10.00 percent year over year."
+
+    assert EvidenceValidationService._text_supported(claim, evidence) is True
+
+
+def test_text_supported_rejects_unrelated_evidence() -> None:
+    claim = "Alpha revenue growth was 10.00 percent."
+    evidence = "Beta announced a new product launch event next quarter."
+
+    assert EvidenceValidationService._text_supported(claim, evidence) is False
+
+
 def test_supported_calculated_claim_is_approved() -> None:
     """A claim matching its calculation and evidence should pass."""
 

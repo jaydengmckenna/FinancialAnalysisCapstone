@@ -1,6 +1,9 @@
 """Application entry point for the current research workflow."""
 
+import sys
+
 from fin_automation.config import get_settings
+from fin_automation.exceptions import WorkflowError
 from fin_automation.logging_config import (
     configure_logging,
     next_available_log_path,
@@ -29,7 +32,19 @@ def main() -> None:
         raise ValueError("Research request cannot be empty.")
 
     orchestrator = ResearchOrchestrator()
-    research_plan, source_selection = orchestrator.run(raw_user_req)
+
+    try:
+        research_plan, source_selection = orchestrator.run(raw_user_req)
+    except WorkflowError as exc:
+        # An unrecoverable failure (retries exhausted on a required
+        # stage) must end the run with a clear, structured message
+        # rather than an unhandled traceback — there is no formal
+        # WorkflowState result to report yet (see
+        # docs/design-tradeoffs.md), but the person running this
+        # still needs to know the workflow stopped and why.
+        print("\n=== Workflow outcome ===")
+        print(f"The workflow stopped with an unrecoverable error: {exc}")
+        sys.exit(1)
 
     print("Research plan:")
     print(research_plan.model_dump_json(indent=2))

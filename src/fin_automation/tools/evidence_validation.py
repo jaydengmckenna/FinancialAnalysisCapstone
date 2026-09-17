@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Iterable
+from typing import TypeVar
 from uuid import UUID
 
 from fin_automation.models.financial import (
@@ -27,6 +28,8 @@ from fin_automation.models.common import (
     WorkflowStage,
 )
 
+
+_RecordT = TypeVar("_RecordT")
 
 _STOP_WORDS = {
     "a", "an", "and", "as", "at", "by", "for", "from", "has",
@@ -158,10 +161,21 @@ class EvidenceValidationService:
         )
 
     @staticmethod
-    def _index(records: Iterable[object], field_name: str) -> dict[UUID, object]:
-        """Index records and reject duplicate identifiers."""
+    def _index(records: Iterable[_RecordT], field_name: str) -> dict[UUID, _RecordT]:
+        """Index records and reject duplicate identifiers.
 
-        indexed: dict[UUID, object] = {}
+        Generic in the record type so callers get back a properly
+        typed dict (e.g. `dict[UUID, ExtractedEvidence]`) instead of
+        `dict[UUID, object]`, which would otherwise force every
+        downstream attribute access (`evidence.source_id`, etc.) to be
+        flagged by static type checkers even though it's always
+        correct at runtime — `field_name` is still a dynamic
+        `getattr`, so it can't be checked either way, but that's
+        internal to this method, not something every caller has to
+        work around.
+        """
+
+        indexed: dict[UUID, _RecordT] = {}
         for record in records:
             identifier = getattr(record, field_name)
             if identifier in indexed:
@@ -197,9 +211,9 @@ class EvidenceValidationService:
         *,
         workflow_id: UUID,
         claims: list[ValidationClaim],
-        sources_by_id: dict[UUID, object],
-        evidence_by_id: dict[UUID, object],
-        calculations_by_id: dict[UUID, object],
+        sources_by_id: dict[UUID, SourceRecord],
+        evidence_by_id: dict[UUID, ExtractedEvidence],
+        calculations_by_id: dict[UUID, CalculatedMetric],
         findings: list[ValidationFinding],
     ) -> None:
         """Validate claim references and claim-to-record support."""
@@ -322,7 +336,7 @@ class EvidenceValidationService:
         workflow_id: UUID,
         claim: ValidationClaim,
         calculation: CalculatedMetric,
-        evidence_by_id: dict[UUID, object],
+        evidence_by_id: dict[UUID, ExtractedEvidence],
         findings: list[ValidationFinding],
     ) -> None:
         """Verify exact calculation metadata and evidence lineage."""
@@ -366,7 +380,7 @@ class EvidenceValidationService:
         workflow_id: UUID,
         claim: ValidationClaim,
         calculation: CalculatedMetric,
-        evidence_by_id: dict[UUID, object],
+        evidence_by_id: dict[UUID, ExtractedEvidence],
         findings: list[ValidationFinding],
     ) -> None:
         """Reject calculations that compare different period granularities."""
@@ -441,7 +455,7 @@ class EvidenceValidationService:
         research_plan: ResearchPlan,
         recommendation: RecommendationResult,
         candidate_analyses: list[CandidateAnalysis],
-        analyses_by_id: dict[UUID, object],
+        analyses_by_id: dict[UUID, CandidateAnalysis],
         findings: list[ValidationFinding],
     ) -> None:
         """Validate recommendation references, alignment, and safety."""
@@ -568,17 +582,36 @@ class EvidenceValidationService:
         return ValidationOutcome.ANALYSIS_CORRECTION_REQUIRED
 
     @staticmethod
+    def _tokenize(text: str) -> set[str]:
+        """Split text into lowercase word/number tokens.
+
+        `_claim_text_for_evidence` always ends a claim with a
+        sentence-final period ("...for 2026."), and the `.` in the
+        character class below is needed to keep decimal numbers like
+        "3.108" as one token. Left alone, that same character class
+        also glues a sentence-final period onto whatever word precedes
+        it ("2026." instead of "2026"), so a bare year at the end of a
+        claim would never match the same year appearing mid-sentence
+        in the evidence it's citing. Stripping a trailing "." off each
+        token (a real decimal number never ends in one) fixes that
+        without giving up decimal-number matching.
+        """
+
+        return {
+            token.rstrip(".")
+            for token in re.findall(r"[a-z0-9.]+", text.casefold())
+        }
+
+    @staticmethod
     def _text_supported(claim: str, evidence: str) -> bool:
         """Require meaningful lexical overlap for a citation."""
 
         claim_tokens = {
             token
-            for token in re.findall(r"[a-z0-9.]+", claim.casefold())
+            for token in EvidenceValidationService._tokenize(claim)
             if token not in _STOP_WORDS and len(token) > 2
         }
-        evidence_tokens = set(
-            re.findall(r"[a-z0-9.]+", evidence.casefold())
-        )
+        evidence_tokens = EvidenceValidationService._tokenize(evidence)
         return len(claim_tokens & evidence_tokens) >= 2
 
     @staticmethod
