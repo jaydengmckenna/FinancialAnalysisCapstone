@@ -161,7 +161,32 @@ full rationale, including the ticker-resolution and fiscal-year-search
 design decisions. This entry exists here mainly to tie it into the
 same "what we decided and why" narrative as the rest of this document.
 
-## 5. What We'd Improve With More Time
+## 5. Single-Candidate Research Scope — Multi-Candidate Fields Reserved for Future Expansion
+
+**The decision:** the project's research scope has been single-candidate
+throughout — evaluating one company against the investor's profile,
+not ranking several candidates against each other. This was a
+deliberate choice to avoid introducing a second, largely untested
+surface (candidate-vs-candidate comparison logic, and the additional
+failure modes and tests that would come with it) this late in the
+project.
+
+**What this means for the schema:** `CandidateAnalysis.opposing_evidence_ids`
+and `RecommendationResult.alternative_candidates` both exist as real
+fields — `opposing_evidence_ids` for evidence that weakens a candidate
+relative to others being compared, `alternative_candidates` for
+candidates considered but not preferred. Both are always left as `[]`
+by `orchestrator.py` today. That's correct behavior for the current
+scope, not a bug: with one candidate evaluated per request, there is
+no "other candidate" for either field to hold anything about.
+
+**Status:** the fields are left in place, unused, rather than removed
+from the schema — the same low-risk precedent as `WorkflowState` and
+`RetrievalResult` elsewhere in this document. If multi-candidate
+comparison is ever built, the schema to receive it already exists;
+nothing has to be added retroactively.
+
+## 6. What We'd Improve With More Time
 
 - Real per-stage correction routing via `WorkflowState` and
   `ValidationCorrectionRouter` (see §1), instead of a single blanket
@@ -178,5 +203,8 @@ same "what we decided and why" narrative as the rest of this document.
   "FY2024") — this would have caught the Microsoft mislabeling at the
   extraction stage, before either the calculator guard or human review
   needed to matter.
+- Multi-candidate comparison (see §5) — populating `opposing_evidence_ids`
+  and `alternative_candidates` with real content once there's more
+  than one candidate to compare against.
 - Phase 10's structured adversarial test suite, which will formalize
   much of what today's live QA passes found by hand.

@@ -320,13 +320,24 @@ class ReportWriterTool(Tool):
         self._report_structure_validation(report_draft)
 
         output_directory = self._output_directory
-        output_directory.mkdir(parents=True, exist_ok=True)
-        file_path = self._next_available_path(output_directory)
-
-        # Write the report to the Markdown file
         markdown_content = report_draft.markdown_content
-        with file_path.open("w", encoding="utf-8") as report_file:
-            report_file.write(markdown_content)
+
+        try:
+            output_directory.mkdir(parents=True, exist_ok=True)
+            file_path = self._next_available_path(output_directory)
+            with file_path.open("w", encoding="utf-8") as report_file:
+                report_file.write(markdown_content)
+        except OSError as error:
+            # A validated, approved report failing to write to disk
+            # (permission denied, disk full, an invalid path) is a
+            # real failure, not a validation problem — but it must
+            # still surface as a ValueError like every other failure
+            # this tool raises, so the same bounded-retry handling
+            # that already wraps report generation covers it too,
+            # instead of an unhandled OSError reaching the caller.
+            raise ValueError(
+                f"Failed to write the report file: {error}"
+            ) from error
 
         checksum = hashlib.sha256(
             markdown_content.encode("utf-8")

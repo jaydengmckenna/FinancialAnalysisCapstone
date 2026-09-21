@@ -473,7 +473,11 @@ class ResearchOrchestrator:
     ) -> list[CandidateAnalysis]:
         """Build a minimal, internally consistent analysis set."""
 
-        material_risks = self._default_material_risks(research_plan)
+        # Plan-level risk categories apply to every candidate equally
+        # and only need computing once; the score-derived risk below
+        # is specific to each candidate's own result, so it's computed
+        # per candidate inside the loop instead.
+        plan_risks = self._default_material_risks(research_plan)
         candidate_names = list(research_plan.candidate_names)
         if not candidate_names:
             candidate_names = [
@@ -506,6 +510,10 @@ class ResearchOrchestrator:
                 )
                 if calc_ids
                 else None
+            )
+            candidate_material_risks = plan_risks + self._score_derived_risk(
+                calculations=calculations,
+                candidate_name=candidate_name,
             )
 
             category = CategoryEvaluation(
@@ -542,7 +550,7 @@ class ResearchOrchestrator:
                     calculation_ids=calc_ids,
                     strengths=["Supported by extracted evidence."],
                     weaknesses=[],
-                    material_risks=material_risks,
+                    material_risks=candidate_material_risks,
                     supporting_evidence_ids=supporting_evidence,
                     opposing_evidence_ids=[],
                     missing_information=[],
@@ -569,6 +577,33 @@ class ResearchOrchestrator:
     _GROWTH_SCORE_FLOOR = Decimal("15")
     _NO_GROWTH_RATE_SCORE = Decimal("50")
 
+    @staticmethod
+    def _growth_rate_for_candidate(
+        calculations: list[CalculatedMetric],
+        candidate_name: str,
+    ) -> Decimal | None:
+        """Return a candidate's own calculated growth-rate percent, if any.
+
+        Shared by `_score_financial_performance` and
+        `_score_derived_risk` so both read the same result instead of
+        two independent lookups drifting apart.
+        """
+
+        return next(
+            (
+                calculation.value
+                for calculation in calculations
+                if calculation.operation == CalculationOperation.GROWTH_RATE
+                and calculation.unit == "percent"
+                and candidate_name.casefold()
+                in {
+                    name.casefold()
+                    for name in calculation.candidate_names
+                }
+            ),
+            None,
+        )
+
     @classmethod
     def _score_financial_performance(
         cls,
@@ -586,19 +621,8 @@ class ResearchOrchestrator:
         score is used instead of guessing at those.
         """
 
-        growth_rate = next(
-            (
-                calculation.value
-                for calculation in calculations
-                if calculation.operation == CalculationOperation.GROWTH_RATE
-                and calculation.unit == "percent"
-                and candidate_name.casefold()
-                in {
-                    name.casefold()
-                    for name in calculation.candidate_names
-                }
-            ),
-            None,
+        growth_rate = cls._growth_rate_for_candidate(
+            calculations, candidate_name
         )
 
         if growth_rate is None:
@@ -609,6 +633,36 @@ class ResearchOrchestrator:
                 return score
 
         return cls._GROWTH_SCORE_FLOOR
+
+    @classmethod
+    def _score_derived_risk(
+        cls,
+        calculations: list[CalculatedMetric],
+        candidate_name: str,
+    ) -> list[str]:
+        """Disclose a candidate's own calculated decline as a risk.
+
+        `_default_material_risks` restates the Research Planning
+        Agent's risk categories — decided before any evidence existed,
+        the same regardless of what the numbers turn out to be. This
+        adds the one thing that can only be known after calculating a
+        result: whether the candidate's own growth rate actually
+        declined. Returns nothing when growth is flat or positive, or
+        when no growth-rate calculation exists to judge — this is a
+        disclosure of a specific finding, not a guess.
+        """
+
+        growth_rate = cls._growth_rate_for_candidate(
+            calculations, candidate_name
+        )
+
+        if growth_rate is None or growth_rate >= Decimal("0"):
+            return []
+
+        return [
+            f"Calculated growth rate of {growth_rate}% indicates a "
+            f"decline for {candidate_name} in the periods reviewed."
+        ]
 
     def _default_recommendation(
         self,
@@ -653,6 +707,19 @@ class ResearchOrchestrator:
             outcome = RecommendationOutcome.RESEARCH_SHORTLIST
             ranked_candidates = []
 
+        # The preferred candidate's own CandidateAnalysis already
+        # carries the combined plan-level and score-derived risks
+        # (see _default_candidate_analyses) — reuse it directly so the
+        # recommendation and the analysis never disagree about what
+        # was disclosed. Without a preferred candidate there's no
+        # specific result to draw a score-derived risk from, so this
+        # falls back to just the plan-level risk categories.
+        recommendation_material_risks = (
+            completed_analyses[0].material_risks
+            if completed_analyses
+            else self._default_material_risks(research_plan)
+        )
+
         return RecommendationResult(
             workflow_id=research_plan.workflow_id,
             outcome=outcome,
@@ -662,7 +729,7 @@ class ResearchOrchestrator:
             candidate_analysis_ids=[analysis.analysis_id for analysis in candidate_analyses],
             supporting_evidence_ids=[],
             opposing_evidence_ids=[],
-            material_risks=self._default_material_risks(research_plan),
+            material_risks=recommendation_material_risks,
             missing_information=missing_information,
             unresolved_conflicts=[],
             rationale=(

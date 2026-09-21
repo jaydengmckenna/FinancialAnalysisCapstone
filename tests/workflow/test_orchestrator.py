@@ -12,6 +12,7 @@ from fin_automation.models.common import (
     SearchPurpose,
     SourceCategory,
     SourceSelectionStatus,
+    WorkflowStage,
 )
 from fin_automation.models.financial import (
     CalculatedMetric,
@@ -25,7 +26,12 @@ from fin_automation.models.intake import (
     ResearchRequest,
     ResearchScope,
 )
-from fin_automation.models.research import EvidenceRequirement, ResearchPlan, SearchQuery
+from fin_automation.models.research import (
+    AdditionalResearchRequest,
+    EvidenceRequirement,
+    ResearchPlan,
+    SearchQuery,
+)
 from fin_automation.models.reports import ReportArtifact, ReportDraft
 from fin_automation.models.sources import (
     ExtractedEvidence,
@@ -61,6 +67,7 @@ class DummySourceSelectionAgent:
         self.called_with = None
 
     def search_and_select(self, research_plan):
+
         self.called_with = research_plan
         requirement = research_plan.evidence_requirements[0]
         return SourceSelection(
@@ -395,4 +402,51 @@ def test_score_financial_performance_neutral_for_non_percent_operation() -> None
     )
 
     assert score == ResearchOrchestrator._NO_GROWTH_RATE_SCORE
+
+
+def test_score_derived_risk_flags_declining_growth() -> None:
+    risks = ResearchOrchestrator._score_derived_risk(
+        calculations=[_growth_calculation(value="-12.4")],
+        candidate_name="Example Inc",
+    )
+
+    assert len(risks) == 1
+    assert "-12.4%" in risks[0]
+    assert "Example Inc" in risks[0]
+
+
+def test_score_derived_risk_silent_for_positive_growth() -> None:
+    risks = ResearchOrchestrator._score_derived_risk(
+        calculations=[_growth_calculation(value="2.09")],
+        candidate_name="Example Inc",
+    )
+
+    assert risks == []
+
+
+def test_score_derived_risk_silent_for_zero_growth() -> None:
+    risks = ResearchOrchestrator._score_derived_risk(
+        calculations=[_growth_calculation(value="0")],
+        candidate_name="Example Inc",
+    )
+
+    assert risks == []
+
+
+def test_score_derived_risk_silent_when_no_growth_rate_calculated() -> None:
+    risks = ResearchOrchestrator._score_derived_risk(
+        calculations=[],
+        candidate_name="Example Inc",
+    )
+
+    assert risks == []
+
+
+def test_score_derived_risk_ignores_other_candidates_calculation() -> None:
+    risks = ResearchOrchestrator._score_derived_risk(
+        calculations=[_growth_calculation(value="-50", candidate="Other Inc")],
+        candidate_name="Example Inc",
+    )
+
+    assert risks == []
 

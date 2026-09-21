@@ -261,6 +261,28 @@ def test_forward_rejects_unapproved_evidence_id(tmp_path: Path) -> None:
         context["tool"].forward(payload)
 
 
+def test_forward_reports_file_write_failure_as_value_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A disk-level failure while writing the report must surface as
+    the same ValueError every other forward() failure raises, not an
+    unhandled OSError — so it flows through the same bounded-retry
+    handling as any other report-generation failure instead of
+    crashing the workflow with a raw traceback."""
+
+    context = make_context(tmp_path)
+    payload = make_payload(context)
+
+    def _raise_os_error(self, *args, **kwargs):
+        raise OSError("Simulated disk failure.")
+
+    monkeypatch.setattr(Path, "open", _raise_os_error)
+
+    with pytest.raises(ValueError, match="Failed to write the report file"):
+        context["tool"].forward(payload)
+
+
 def test_forward_rejects_mismatched_preferred_candidate(
     tmp_path: Path,
 ) -> None:
