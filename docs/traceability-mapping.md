@@ -3,7 +3,7 @@
 This maps every functional requirement in `specs/functional-requirements.md`
 (114 requirements, FR-001 through FR-116) to the test(s) that verify it, or
 explains honestly why one doesn't exist. It was built by reading the full
-requirements spec against the actual test suite (354 tests as of
+requirements spec against the actual test suite (356 tests as of
 2026-09-21) and the actual implementation — not assumed from the spec text
 alone, since several requirements describe behavior that was later
 intentionally superseded (see `docs/design-tradeoffs.md` and
@@ -183,7 +183,7 @@ requirements below predate that decision.
 | FR | Requirement | Status | Test(s) / Note |
 |---|---|---|---|
 | FR-100 | Use Explicit Workflow Order | Covered | `test_orchestrator_executes_full_phase_9_pipeline`; `orchestrator.run()`'s fixed stage sequence. |
-| FR-101 | Maintain Workflow State | Partial (documented) | Already an explicit, documented decision — `WorkflowState` was descoped in favor of ad-hoc `self.last_*` attributes. See `docs/design-tradeoffs.md` §1. |
+| FR-101 | Maintain Workflow State | Partial (documented) | Already an explicit, documented decision — `WorkflowState` was descoped in favor of ad-hoc `self.last_*` attributes. See `docs/design-tradeoffs.md` §1. Accumulation of source/evidence records across a retry round (rather than discarding prior rounds) is covered by `test_orchestrator_retries_and_accumulates_evidence_after_correction_required`. |
 | FR-102 | Validate Stage Input | Covered | `ValueError` raised at each stage boundary, e.g. `_validate_source_selection_identity`. |
 | FR-103 | Validate Stage Output | Covered | Pydantic validation at every stage transition. |
 | FR-104 | Stop Invalid Downstream Processing | Covered | `test_create_research_plan_stops_incomplete_intake`; `_run_with_retries` raising `WorkflowError`; `test_search_and_select_raises_when_agent_never_submits`, `test_extract_evidence_rejects_source_outside_extraction_scope`. |

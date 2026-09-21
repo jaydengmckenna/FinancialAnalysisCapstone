@@ -5,12 +5,12 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 
 ## Run details
 
-- **Date:** 2026-09-21 (regenerated — added agent-level tests for
-  Source Selection and Evidence Extraction)
-- **Base commit:** `5cf6dfa` (plus 11 files with uncommitted changes
-  at run time — this reflects the actual working tree the suite was
-  run against, not a claim that a specific commit alone produces this
-  result).
+- **Date:** 2026-09-21 (regenerated — added an end-to-end orchestrator
+  test covering retry/accumulation across a correction-required round)
+- **Base commit:** `5fa79fc` (plus uncommitted changes to
+  `tests/workflow/test_orchestrator.py` at run time — this reflects
+  the actual working tree the suite was run against, not a claim that
+  a specific commit alone produces this result).
 - **Python:** 3.12.3
 - **Command:** `python -m pytest -v`
 - **External dependencies:** none required. OpenAI, Tavily, and
@@ -20,7 +20,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 ## Result
 
 ```
-354 passed in 2.63s
+356 passed in 2.54s
 ```
 
 0 failed, 0 errors, 0 skipped.
@@ -39,7 +39,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 | `tests/test_models/test_sources.py` | 21 |
 | `tests/tools/test_evidence_validation.py` | 18 |
 | `tests/test_models/test_research.py` | 17 |
-| `tests/workflow/test_orchestrator.py` | 12 |
+| `tests/workflow/test_orchestrator.py` | 14 |
 | `tests/tools/test_financial_data.py` | 11 |
 | `tests/prompts/test_research_planning.py` | 11 |
 | `tests/agents/test_research_planner_planning.py` | 11 |
@@ -56,7 +56,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 | `tests/prompts/test_evidence_extraction_prompt.py` | 2 |
 | `tests/tools/test_evidence_submission.py` | 1 |
 | `tests/test_main.py` | 1 |
-| **Total** | **354** |
+| **Total** | **356** |
 
 ## Reproducing this result
 

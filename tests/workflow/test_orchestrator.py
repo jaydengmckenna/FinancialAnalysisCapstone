@@ -7,11 +7,14 @@ from uuid import uuid4
 from fin_automation.models.common import (
     AnalysisStatus,
     ConfidenceLevel,
+    CorrectionTarget,
     DataAvailabilityStatus,
     RecommendationOutcome,
     SearchPurpose,
     SourceCategory,
     SourceSelectionStatus,
+    ValidationCategory,
+    ValidationSeverity,
     WorkflowStage,
 )
 from fin_automation.models.financial import (
@@ -39,7 +42,7 @@ from fin_automation.models.sources import (
     SourceRecord,
     SourceSelection,
 )
-from fin_automation.models.validation import ValidationResult
+from fin_automation.models.validation import ValidationFinding, ValidationResult
 from fin_automation.workflow.orchestrator import ResearchOrchestrator
 
 
@@ -65,10 +68,11 @@ class DummyPlanner:
 class DummySourceSelectionAgent:
     def __init__(self):
         self.called_with = None
+        self.call_count = 0
 
-    def search_and_select(self, research_plan):
-
+    def search_and_select(self, research_plan, additional_research_requests=None):
         self.called_with = research_plan
+        self.call_count += 1
         requirement = research_plan.evidence_requirements[0]
         return SourceSelection(
             workflow_id=research_plan.workflow_id,
@@ -172,6 +176,152 @@ class DummyEvidenceValidationAgent:
             approved_evidence_ids=[evidence.evidence_id for evidence in kwargs["evidence_records"]],
             approved_calculation_ids=[calculation.calculation_id for calculation in kwargs["calculations"]],
             summary="Validated.",
+        )
+
+
+class DummyEvidenceValidationAgentRequiringOneCorrection:
+    """Fails the first validation with a real AdditionalResearchRequest,
+    then approves the second — simulating exactly one correction round
+    so the orchestrator's retry-and-accumulate path actually runs.
+
+    `analysis_correction_required` alone does not trigger a retry in
+    `orchestrator.run()` — the retry only fires when there's a
+    non-empty `additional_research_requests` list to act on. Returning
+    just the outcome without a real request would make this dummy
+    indistinguishable from "no correction was requested" and the
+    workflow would simply stop instead of retrying.
+    """
+
+    def __init__(self):
+        self.call_count = 0
+
+    def validate(self, **kwargs):
+        self.call_count += 1
+
+        if self.call_count == 1:
+            return ValidationResult(
+                workflow_id=kwargs["research_request"].workflow_id,
+                recommendation_id=kwargs["recommendation"].recommendation_id,
+                outcome="analysis_correction_required",
+                findings=[
+                    ValidationFinding(
+                        workflow_id=kwargs["research_request"].workflow_id,
+                        category=ValidationCategory.MISSING_RISK_OR_LIMITATION,
+                        severity=ValidationSeverity.ERROR,
+                        candidate_name="Example Inc",
+                        description=(
+                            "Round 1 evidence needs a second corroborating "
+                            "source before a recommendation can be approved."
+                        ),
+                        correction_target=CorrectionTarget.FINANCIAL_ANALYSIS,
+                    )
+                ],
+                approved_candidate_analysis_ids=[],
+                approved_source_ids=[],
+                approved_evidence_ids=[],
+                approved_calculation_ids=[],
+                additional_research_requests=[
+                    AdditionalResearchRequest(
+                        workflow_id=kwargs["research_request"].workflow_id,
+                        requested_by_stage=WorkflowStage.EVIDENCE_VALIDATION,
+                        candidate_name="Example Inc",
+                        missing_evidence="Additional corroborating revenue evidence.",
+                        reason="Round 1 evidence needs a second corroborating source.",
+                        suggested_search_purpose=SearchPurpose.SOURCE_CORROBORATION,
+                    )
+                ],
+                summary="Round 1: additional corroboration requested.",
+            )
+
+        return ValidationResult(
+            workflow_id=kwargs["research_request"].workflow_id,
+            recommendation_id=kwargs["recommendation"].recommendation_id,
+            outcome="approved",
+            findings=[],
+            approved_candidate_analysis_ids=[analysis.analysis_id for analysis in kwargs["candidate_analyses"]],
+            approved_source_ids=[source.source_id for source in kwargs["source_records"]],
+            approved_evidence_ids=[evidence.evidence_id for evidence in kwargs["evidence_records"]],
+            approved_calculation_ids=[calculation.calculation_id for calculation in kwargs["calculations"]],
+            summary="Round 2: approved.",
+        )
+
+
+class DummyEvidenceValidationAgentAlwaysRejects:
+    """Requests one round of correction, then rejects outright on the
+    retry — simulating validation that never approves, even after the
+    orchestrator's one allotted retry is spent.
+
+    This exercises the other side of the retry loop from
+    `DummyEvidenceValidationAgentRequiringOneCorrection`: what happens
+    when the retry doesn't recover the workflow. `REJECTED` requires
+    at least one `BLOCKING` finding, distinct from the `ERROR`-severity
+    finding used to request correction in round 1.
+    """
+
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def validate(self, **kwargs):
+        self.call_count += 1
+
+        if self.call_count == 1:
+            return ValidationResult(
+                workflow_id=kwargs["research_request"].workflow_id,
+                recommendation_id=kwargs["recommendation"].recommendation_id,
+                outcome="analysis_correction_required",
+                findings=[
+                    ValidationFinding(
+                        workflow_id=kwargs["research_request"].workflow_id,
+                        category=ValidationCategory.MISSING_RISK_OR_LIMITATION,
+                        severity=ValidationSeverity.ERROR,
+                        candidate_name="Example Inc",
+                        description=(
+                            "Round 1 evidence needs a second corroborating "
+                            "source before a recommendation can be approved."
+                        ),
+                        correction_target=CorrectionTarget.FINANCIAL_ANALYSIS,
+                    )
+                ],
+                approved_candidate_analysis_ids=[],
+                approved_source_ids=[],
+                approved_evidence_ids=[],
+                approved_calculation_ids=[],
+                additional_research_requests=[
+                    AdditionalResearchRequest(
+                        workflow_id=kwargs["research_request"].workflow_id,
+                        requested_by_stage=WorkflowStage.EVIDENCE_VALIDATION,
+                        candidate_name="Example Inc",
+                        missing_evidence="Additional corroborating revenue evidence.",
+                        reason="Round 1 evidence needs a second corroborating source.",
+                        suggested_search_purpose=SearchPurpose.SOURCE_CORROBORATION,
+                    )
+                ],
+                summary="Round 1: additional corroboration requested.",
+            )
+
+        return ValidationResult(
+            workflow_id=kwargs["research_request"].workflow_id,
+            recommendation_id=kwargs["recommendation"].recommendation_id,
+            outcome="rejected",
+            findings=[
+                ValidationFinding(
+                    workflow_id=kwargs["research_request"].workflow_id,
+                    category=ValidationCategory.HUMAN_REVIEW_BOUNDARY_FAILURE,
+                    severity=ValidationSeverity.BLOCKING,
+                    candidate_name="Example Inc",
+                    description="Round 2 recommendation guarantees a return.",
+                    required_correction=(
+                        "Guarantee language cannot be corrected; the "
+                        "recommendation must not be reported."
+                    ),
+                    correction_target=CorrectionTarget.FINANCIAL_ANALYSIS,
+                )
+            ],
+            approved_candidate_analysis_ids=[],
+            approved_source_ids=[],
+            approved_evidence_ids=[],
+            approved_calculation_ids=[],
+            summary="Round 2: rejected.",
         )
 
 
@@ -321,6 +471,102 @@ def test_orchestrator_executes_full_phase_9_pipeline() -> None:
     assert orchestrator.last_validation_result is not None
     assert orchestrator.last_report_draft is not None
     assert orchestrator.last_report_artifact is not None
+
+
+def test_orchestrator_retries_and_accumulates_evidence_after_correction_required() -> None:
+    """A validation round that asks for additional research must not
+    discard evidence already gathered in the first round.
+
+    This is the actual regression the retry-accumulation fix (earlier
+    in the project) guards against: round 1 finds real evidence,
+    validation asks for one more corroborating source rather than
+    rejecting round 1 outright, and round 2's results must be added to
+    round 1's, not replace them. Before the fix, the orchestrator
+    rebuilt `evidence_records`/`source_records` from scratch each
+    retry attempt, silently losing whatever round 1 had already found.
+    """
+
+    plan = make_plan()
+    intake_result = make_intake_result(str(plan.workflow_id))
+    dummy_planner = DummyPlanner(plan, intake_result=intake_result)
+    dummy_source_agent = DummySourceSelectionAgent()
+    dummy_validation_agent = DummyEvidenceValidationAgentRequiringOneCorrection()
+
+    orchestrator = ResearchOrchestrator(
+        research_planner=dummy_planner,
+        source_selection_agent=dummy_source_agent,
+        evidence_extraction_agent=DummyEvidenceExtractionAgent(),
+        financial_analysis_agent=DummyFinancialAnalysisAgent(),
+        evidence_validation_agent=dummy_validation_agent,
+        report_agent=DummyReportAgent(),
+    )
+
+    returned_plan, result = orchestrator.run("Research Example Inc")
+
+    assert returned_plan == plan
+    assert result.workflow_id == plan.workflow_id
+
+    # Both stages ran twice: once per research round.
+    assert dummy_source_agent.call_count == 2
+    assert dummy_validation_agent.call_count == 2
+
+    # The proof: 4 evidence records (2 per round), not 2 — round 1's
+    # evidence survived into round 2 instead of being replaced by it.
+    assert len(orchestrator.last_evidence_records) == 4
+    assert len(orchestrator.last_source_records) == 2
+
+    # The retry recovered rather than dead-ending: a report was still
+    # produced despite the first-round correction request.
+    assert orchestrator.last_validation_result is not None
+    assert orchestrator.last_validation_result.outcome.value == "approved"
+    assert orchestrator.last_report_draft is not None
+    assert orchestrator.last_report_artifact is not None
+
+
+def test_orchestrator_produces_no_report_when_never_approved() -> None:
+    """A workflow that is still not approved after the one allotted
+    retry must terminate without generating a report.
+
+    The retry loop (`orchestrator.run()`) only retries once
+    (`for attempt in range(2)`, gated on `attempt == 0`). This proves
+    the other side of that boundary: once the retry is spent and
+    validation still hasn't approved the result, `run_report_generation`
+    must never be called, regardless of which non-approved outcome
+    validation lands on. `REJECTED` is used here since it's the
+    outcome most directly tied to unsafe content (a recommendation
+    that guarantees a return) — the case where generating any report,
+    flagged or not, would be the wrong behavior.
+    """
+
+    plan = make_plan()
+    intake_result = make_intake_result(str(plan.workflow_id))
+    dummy_planner = DummyPlanner(plan, intake_result=intake_result)
+    dummy_source_agent = DummySourceSelectionAgent()
+    dummy_validation_agent = DummyEvidenceValidationAgentAlwaysRejects()
+
+    orchestrator = ResearchOrchestrator(
+        research_planner=dummy_planner,
+        source_selection_agent=dummy_source_agent,
+        evidence_extraction_agent=DummyEvidenceExtractionAgent(),
+        financial_analysis_agent=DummyFinancialAnalysisAgent(),
+        evidence_validation_agent=dummy_validation_agent,
+        report_agent=DummyReportAgent(),
+    )
+
+    returned_plan, result = orchestrator.run("Research Example Inc")
+
+    assert returned_plan == plan
+    assert result.workflow_id == plan.workflow_id
+
+    # The retry still happened once, same as the recovery case.
+    assert dummy_source_agent.call_count == 2
+    assert dummy_validation_agent.call_count == 2
+
+    # But it was not spent again: rejection on round 2 is terminal.
+    assert orchestrator.last_validation_result is not None
+    assert orchestrator.last_validation_result.outcome.value == "rejected"
+    assert orchestrator.last_report_draft is None
+    assert orchestrator.last_report_artifact is None
 
 
 def _growth_calculation(*, value: str, candidate="Example Inc") -> CalculatedMetric:

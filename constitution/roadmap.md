@@ -62,7 +62,7 @@ The roadmap uses the following statuses:
 | Phase 7: Evidence Validation and Safety | Completed |
 | Phase 8: Markdown Report Generation | Completed |
 | Phase 9: Complete Product Workflow | Completed |
-| Phase 10: Testing and Quality Verification | Not Started |
+| Phase 10: Testing and Quality Verification | Completed |
 | Phase 11: Documentation and Submission Preparation | Not Started |
 
 ## Current Focus
@@ -88,7 +88,12 @@ restructuring the orchestrator's control flow this late in the
 project. See `docs/design-tradeoffs.md` for the full reasoning behind
 this and the other scope decisions made while closing out Phase 9.
 
-The current focus is now Phase 10: Testing and Quality Verification.
+Phase 10: Testing and Quality Verification is also complete — the
+full suite (356 tests), traceability mapping, test-results artifact,
+and final acceptance review are all in place; see that section below.
+
+The current focus is now Phase 11: Documentation and Submission
+Preparation.
 
 ---
 
@@ -1828,13 +1833,11 @@ Phase 9 depends on completion of Phases 5 through 8.
 
 ### Status
 
-In Progress (reviewed 2026-09-21). The adversarial suite, the
-traceability mapping, and the test-results artifact are all complete.
-What remains: the final acceptance review, and the still-partial
-happy-path/end-to-end items noted below (agent-level tests for search
-result handling, evidence parsing, and multi-candidate comparison —
-the last of these is now N/A given the project's single-candidate
-scope, see `docs/design-tradeoffs.md` §5).
+Completed (2026-09-21). Every Phase 10 deliverable is complete —
+unit, happy-path, failure-path, adversarial, and end-to-end suites;
+the traceability mapping; the test-results artifact; defect
+corrections; and the final acceptance review, closed out last by
+design.
 
 ### Goal
 
@@ -1845,7 +1848,7 @@ workflow for the first time.
 
 ### Planned Deliverables
 
-- [x] Unit-test suite. 332 tests exist across models, tools, agents,
+- [x] Unit-test suite. 356 tests exist across models, tools, agents,
       prompts, and the orchestrator (`tests/`).
 - [x] Happy-path suite. All 10 items in the Planned Happy-Path
       Coverage list below are now covered.
@@ -1859,18 +1862,85 @@ workflow for the first time.
       available coverage for a free-form-judgment failure mode, but
       worth remembering that's what "covered" means for those two
       specifically. See notes below.
-- [~] End-to-end tests. `test_orchestrator_executes_full_phase_9_pipeline`
-      exercises the full pipeline with dummy agents; no test yet
-      exercises the full pipeline through failure/correction paths.
+- [x] End-to-end tests. Three orchestrator-level pipeline paths are
+      covered, matching the three outcomes `orchestrator.run()`'s
+      one-retry loop can actually reach:
+      `test_orchestrator_executes_full_phase_9_pipeline` exercises the
+      full happy-path pipeline with dummy agents (approved on the
+      first try).
+      `test_orchestrator_retries_and_accumulates_evidence_after_correction_required`
+      exercises the failure/correction path: a validation round that
+      requests additional research, verifying the retry actually
+      happens and round 1's evidence survives into round 2 rather than
+      being discarded — the retry-accumulation fix from earlier in the
+      project, previously only proven by live runs.
+      `test_orchestrator_produces_no_report_when_never_approved`
+      exercises the case where the one allotted retry doesn't recover
+      the workflow (round 2 outcome is `REJECTED`): confirms
+      `run_report_generation` is never called and no report exists —
+      the actual guarantee behind "no known failure allows an
+      unsupported recommendation to be approved." Verified each of the
+      latter two tests actually catches its regression by temporarily
+      reintroducing the corresponding bug (discarding round 1 evidence;
+      generating a report regardless of outcome) and confirming the
+      test fails, then reverting.
 - [x] Requirement-to-test traceability mapping. `docs/traceability-mapping.md`
       — all 114 functional requirements mapped, with honest status
       (Covered/Partial/N/A/Not automated) and a summary of gaps found
       along the way.
-- [x] Test-results artifact. `docs/test-results.md` — 350 passed, 0
+- [x] Test-results artifact. `docs/test-results.md` — 356 passed, 0
       failed, per-file breakdown, reproduction steps.
-- [ ] Defect corrections. Ongoing as gaps are found; not yet closed
-      out for Phase 10 specifically.
-- [ ] Final acceptance review. Does not exist yet.
+- [x] Defect corrections. One real defect was found and fixed during
+      this Phase 10 pass: `ReportWriterTool.forward()` had no handling
+      for a disk-level write failure (`OSError`), discovered while
+      scoping the "file writing fails" adversarial scenario; now
+      caught and re-raised as `ValueError`, consistent with every
+      other failure this tool raises. Other gaps found along the way
+      (`docs/traceability-mapping.md`'s four remaining findings) were
+      documented, not fixed, by deliberate choice — not defects left
+      open by oversight.
+- [x] Final acceptance review.
+
+      **Scope.** Phase 10's goal was to verify — not extend — the
+      product built through Phase 9: correct on the happy path,
+      resilient to expected failures, and resistant to adversarial
+      input, with that verification traceable back to the functional
+      requirements.
+
+      **Verification performed.** 356 tests pass (`docs/test-results.md`),
+      0 failed. All 10 happy-path scenarios, all 18 adversarial
+      scenarios (16 covered, 2 confirmed not applicable to the actual
+      architecture), and all three end-to-end pipeline paths (full
+      approval; retry-with-accumulation after a correction-required
+      round; and no report generated when the retry is exhausted
+      without approval) are covered and annotated above. All 114
+      functional requirements are mapped to tests or an honest reason
+      none exists (`docs/traceability-mapping.md`). Every test added
+      this phase was checked for whether it would actually fail
+      without the behavior it claims to guard — most directly for the
+      two retry-loop end-to-end tests (accumulation, and no-report-
+      when-never-approved), each verified by temporarily reintroducing
+      the underlying bug and confirming the test caught it.
+
+      **Defects found and corrected.** One: `ReportWriterTool` did not
+      handle a disk-level write failure. Fixed and pinned by
+      `test_forward_reports_file_write_failure_as_value_error`.
+
+      **Known, accepted gaps** (not defects — documented and reasoned
+      about, not hidden): unsupported-fact injection and duplicate-
+      source inflation are covered by system-prompt instruction rather
+      than a deterministic check, since neither has a deterministic
+      signal to check against; multi-candidate comparison and
+      multi-source conflict resolution beyond disclosure are reserved
+      for potential future expansion, out of scope for this project's
+      single-candidate design (`docs/design-tradeoffs.md` §5); P/E
+      applicability and malformed-webpage-content scenarios are not
+      applicable, as neither a P/E computation path nor an HTML-parsing
+      stage exists to test.
+
+      **Outcome.** All Phase 10 exit criteria are met. The product is
+      accepted as verified for Phase 11 (Documentation and Submission
+      Preparation).
 
 ### Planned Happy-Path Coverage
 
@@ -2006,7 +2076,7 @@ Tests will verify behavior when:
 
 Phase 10 is complete when:
 
-- [x] Required unit tests pass. 332 tests pass today.
+- [x] Required unit tests pass. 356 tests pass today.
 - [x] Happy-path tests pass. All 10 items covered; see the annotated
       list above.
 - [x] Failure-path tests pass. See the annotated list above.
@@ -2023,7 +2093,10 @@ Phase 10 is complete when:
       results serve the equivalent purpose for the tests that exist.
 - [x] No known failure allows an unsupported recommendation to be
       approved. True for every documented scenario now that all 18
-      adversarial items are covered or confirmed not applicable.
+      adversarial items are covered or confirmed not applicable, and
+      now also proven at the orchestrator level: even after the one
+      allotted retry, an unapproved result produces no report at all
+      (`test_orchestrator_produces_no_report_when_never_approved`).
 - [x] Test results are preserved as a project artifact. `docs/test-results.md`.
 
 ### Dependencies
