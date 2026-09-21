@@ -40,3 +40,28 @@ def test_tavily_search_accepts_current_sdk_depths() -> None:
     assert results[0]["title"] == "Example company update"
     assert results[0]["domain"] == "example.com"
     assert results[0]["raw_content_available"] is True
+
+
+class EmptyTavilyClient:
+    """Fake Tavily client simulating a query with no relevant results."""
+
+    def search(self, **kwargs):
+        return {"results": []}
+
+
+def test_tavily_search_returns_empty_list_for_no_results() -> None:
+    """A query with no relevant results must return an empty result
+    list rather than raising or fabricating a result."""
+
+    tool = TavilySearchTool(api_key="test-key", client=EmptyTavilyClient())
+
+    payload = tool.forward(
+        query="An extremely obscure query with nothing relevant",
+        workflow_id=str(uuid4()),
+        query_id=str(uuid4()),
+        search_depth="basic",
+        max_results=5,
+    )
+
+    results = json.loads(payload)
+    assert results == []

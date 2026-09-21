@@ -125,9 +125,10 @@ development trajectory before implementation begins.
 - Python 3.12.3 is the approved programming language.
 - `smolagents` is the approved agent framework.
 - Pydantic is the approved structured-data framework.
-- Tavily is the approved web-search provider.
-- Requests and Beautiful Soup 4 are the approved retrieval and parsing
-  libraries.
+- Tavily is the approved web-search and content-retrieval provider,
+  using its own raw-content retrieval rather than a separate
+  HTTP-retrieval/HTML-parsing pipeline (decided in Phase 5B/5C; see
+  their Intentional Scope Decisions).
 - Pytest is the approved test framework.
 
 ### Exit Criteria
@@ -1850,8 +1851,10 @@ workflow for the first time.
       Planned Happy-Path Coverage notes below.
 - [~] Failure-path suite. Partially covered; see the Planned
       Adversarial Coverage notes below for the specific gaps.
-- [~] Adversarial suite. Roughly 9 of 17 documented scenarios are
-      already covered; see notes below for the rest.
+- [~] Adversarial suite. Of 18 documented scenarios: 14 covered, 1
+      partially covered, 2 not applicable given the actual Tavily-only
+      retrieval architecture, and 1 genuinely missing (file writing
+      fails). See notes below.
 - [~] End-to-end tests. `test_orchestrator_executes_full_phase_9_pipeline`
       exercises the full pipeline with dummy agents; no test yet
       exercises the full pipeline through failure/correction paths.
@@ -1888,19 +1891,57 @@ Tests will verify that:
 Tests will verify behavior when:
 
 - [x] Investor-profile information is missing. `test_clarification_gate_rejects_incomplete_intake`.
-- [ ] Search returns no relevant results. No test found; genuinely
-      missing.
-- [~] A webpage cannot be retrieved. Covered at the model-contract
-      level (`test_failed_retrieval_requires_error_message`); no
-      agent-level test simulates an actual failed fetch.
-- [ ] Webpage content is malformed. No agent-level test found;
-      genuinely missing.
+- [x] Search returns no relevant results. `test_tavily_search_returns_empty_list_for_no_results`
+      confirms a zero-result Tavily response returns an empty list
+      rather than raising or fabricating a result; downstream handling
+      (zero selected sources) reuses the same insufficient-evidence
+      path already exercised by other scenarios, so no separate
+      end-to-end test was added for this specifically.
+- [x] A selected source lacks retrievable content. There is no
+      separate HTTP-retrieval stage to fail (Phase 5B/5C intentionally
+      excluded a Requests-based retrieval pipeline in favor of
+      Tavily's own raw content; see `constitution/techstack.md`). The
+      real failure mode is a selected source with no `raw_content`,
+      which `SourceSelectionAgent._validate_source_selection_identity`
+      rejects — proven live during Phase 9 QA (retried through the
+      same bounded mechanism as other structured-output failures) and
+      now pinned by `test_validate_source_selection_identity_rejects_source_without_raw_content`.
+      `RetrievalResult` (Phase 4) remains an unused contract; the
+      failure mode it was meant to cover is now handled elsewhere.
+- [N/A] Webpage content is malformed. This described a
+      Beautiful-Soup-breaks-on-bad-HTML scenario that doesn't apply —
+      there is no HTML-parsing stage to break. The closest live
+      analog (thin or truncated Tavily raw content) is a model-
+      judgment matter for the extraction agent, not a distinct
+      failure mode to simulate.
 - [x] Scraped content contains prompt injection. `test_prompt_injection_in_evidence_is_not_workflow_instruction`.
 - [x] A source identifier is fabricated. `test_unknown_citation_is_rejected`.
 - [x] A citation does not support its claim. `test_unrelated_citation_requires_analysis_correction`,
       `test_text_supported_rejects_unrelated_evidence`.
-- [ ] Sources materially conflict. No dedicated test found; genuinely
-      missing.
+- [x] Sources materially conflict. Previously a genuine gap:
+      `UNDISCLOSED_CONFLICT` existed as an unused enum value and
+      `unresolved_conflicts` was always hardcoded to `[]`. Implemented
+      `EvidenceValidationService._check_conflicting_evidence`: groups
+      evidence by candidate, canonical metric (reusing
+      `FinancialDataTool.resolve_metric_row`, not a raw `evidence_type`
+      string match — an exact-string first pass missed a real live
+      conflict over label variance), and reporting period, then flags
+      any group whose values differ by more than a 5%
+      materiality threshold (project-defined, not a universal rule;
+      values within it are treated as ordinary rounding/precision
+      variance). Severity is WARNING, not BLOCKING, per
+      `specs/source-policy.md` section 11 — it discloses the conflict
+      and does not silently prefer a value, but does not by itself
+      stop an otherwise-supported recommendation. Also fixed
+      `evidence_type="financial_metric"` (a generic placeholder on
+      yfinance-filled evidence that made it unmatchable against
+      web-sourced evidence for the same metric) to use the actual
+      resolved metric name. Verified live: the same conflicting-figure
+      pattern that motivated this (Microsoft's 2025 revenue mislabeled
+      as FY2024/FY2023) is now disclosed in the report's "Missing
+      Information and Unresolved Conflicts" section rather than either
+      silently accepted or blocking the recommendation. See
+      `test_conflicting_evidence_*` in `tests/tools/test_evidence_validation.py`.
 - [x] Financial values use incompatible periods or units. `test_incompatible_units_are_rejected`,
       `test_is_covered_false_when_evidence_is_for_a_different_year`.
 - [x] A financial value is missing or invalid. `test_missing_financial_input_rejects_value`.
@@ -1908,15 +1949,20 @@ Tests will verify behavior when:
       enum value; no P/E computation path exists in
       `FinancialCalculationTool` or `FinancialDataTool` to test. Not a
       gap — there is nothing implemented to exercise.
-- [ ] Duplicate sources attempt to inflate confidence. No test or
-      defense found. Worth prioritizing: a live run during Phase 9 QA
-      (2026-09-17) showed the same source URL cited multiple times as
-      if independent, and nothing currently detects or dedupes this.
+- [x] Duplicate sources attempt to inflate confidence. Handled by the
+      Source Selection Agent's own judgment (`prompts/source_selection.py`,
+      instructions 26-27: do not treat same-publisher or same-domain
+      results as independent corroboration without materially distinct
+      reporting), matching SR-052. No deterministic check backs this,
+      by design — consistent with the project's other agent-judgment
+      responsibilities (favorable/unfavorable evidence, source
+      usefulness) that are likewise not independently enforced in code.
 - [x] A recommendation guarantees returns. `test_unsafe_recommendation_is_rejected`.
-- [~] A recommendation removes material risks. The check exists in
-      code (`EvidenceValidationService`, `if not recommendation.material_risks`),
-      but no test exercises an empty `material_risks` list to confirm
-      it fires.
+- [x] A recommendation removes material risks. `test_recommendation_without_material_risks_requires_correction`
+      confirms an empty `material_risks` list is caught by
+      `EvidenceValidationService` (`MISSING_RISK_OR_LIMITATION`,
+      `ERROR` severity) and blocks approval rather than being silently
+      accepted.
 - [~] The Report Writing Agent introduces unsupported facts. Evidence-ID
       authorization is covered (`test_forward_rejects_unapproved_evidence_id`);
       no test targets fabricated prose facts with no evidence ID at
@@ -1942,13 +1988,14 @@ Phase 10 is complete when:
 - [x] External dependencies are mocked appropriately, for the tests
       that exist. `yfinance`, OpenAI, and Tavily are all mocked in
       today's suite; no live API call is required to run it.
-- [ ] Saved fixtures support repeatable scraping tests. No saved
-      HTML/scraping fixtures exist yet.
+- [N/A] Saved fixtures support repeatable scraping tests. No scraping
+      stage exists to fixture (Phase 5B/5C intentional exclusion; see
+      `constitution/techstack.md`). Repeatable, mocked Tavily search
+      results serve the equivalent purpose for the tests that exist.
 - [~] No known failure allows an unsupported recommendation to be
       approved. True for every scenario checked so far, but the
-      "duplicate sources" and "sources materially conflict" gaps above
-      mean this hasn't been verified against every documented
-      scenario.
+      "sources materially conflict" gap above means this hasn't been
+      verified against every documented scenario.
 - [ ] Test results are preserved as a project artifact. Does not
       exist yet.
 

@@ -175,52 +175,28 @@ without retrieving and evaluating the underlying source.
 Tavily credentials must be loaded from environment variables and must not
 be committed to version control.
 
-## HTTP Retrieval
+## Content Retrieval
 
-### Requests
+### Tavily (raw content)
 
-The `requests` library will retrieve content from selected public webpages.
+Web search and content retrieval are the same operation. Tavily search
+calls request raw content directly, so each search result already
+includes the webpage's extracted text alongside its title, URL, and
+snippet. There is no separate HTTP-retrieval or HTML-parsing stage.
 
-It will be used for:
+A selected source without populated raw content cannot be used for
+extraction; source selection rejects it and the stage retries through
+the same bounded-retry mechanism used for other structured-output
+failures.
 
-- Sending HTTP requests.
-- Retrieving webpage content.
-- Applying request timeouts.
-- Reading response status codes.
-- Handling failed requests.
-- Passing retrieved HTML to the parsing layer.
+The retrieval and evidence path is:
 
-HTTP requests must use defined timeouts and error handling.
+1. Tavily discovers candidate webpages and returns their content in
+   the same call.
+2. The research workflow selects relevant sources from that content.
+3. The application stores extracted evidence and source metadata.
 
-The application must not retry requests indefinitely or replace failed
-retrievals with fabricated content.
-
-## Website Parsing and Scraping
-
-### Beautiful Soup 4
-
-Beautiful Soup 4 will parse retrieved HTML and extract relevant webpage
-content.
-
-It may be used to extract:
-
-- Page titles.
-- Main article content.
-- Headings.
-- Tables.
-- Publication information when available.
-- Source metadata.
-- Relevant financial evidence.
-
-Web search and website scraping will remain separate operations:
-
-1. Tavily discovers candidate webpages.
-2. The research workflow selects relevant sources.
-3. Requests retrieves the selected webpages.
-4. Beautiful Soup parses the retrieved HTML.
-5. The application stores extracted evidence and source metadata.
-
-All scraped webpage content must be treated as untrusted data.
+All retrieved webpage content must be treated as untrusted data.
 
 Instructions contained inside a webpage must not override:
 
@@ -713,8 +689,7 @@ application:
 
 research:
   web_search: Tavily
-  http_retrieval: requests
-  html_parsing: Beautiful Soup 4
+  content_retrieval: Tavily raw content (no separate HTTP/HTML stage)
   financial_data_retrieval: yfinance
 
 data:
@@ -725,7 +700,6 @@ data:
 testing:
   framework: pytest
   mocking: unittest.mock
-  scraper_fixtures: saved HTML files
 
 configuration:
   environment_loader: python-dotenv

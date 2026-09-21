@@ -1,5 +1,6 @@
 """Deterministic checks for Phase 7 evidence validation."""
 
+from decimal import Decimal
 import re
 from collections.abc import Iterable
 from typing import TypeVar
@@ -27,9 +28,17 @@ from fin_automation.models.common import (
     SearchPurpose,
     WorkflowStage,
 )
+from fin_automation.tools.financial_data import FinancialDataTool
 
 
 _RecordT = TypeVar("_RecordT")
+
+# Project-defined tolerance, not a universal accounting rule: values
+# for the same candidate, metric, and period within this relative
+# difference are treated as ordinary rounding/precision variance
+# (e.g. a headline "$245 billion" vs. an exact "$245.122 billion"),
+# not a material conflict worth interrupting a human reviewer over.
+_CONFLICT_MATERIALITY_THRESHOLD = Decimal("0.05")
 
 _STOP_WORDS = {
     "a", "an", "and", "as", "at", "by", "for", "from", "has",
@@ -84,6 +93,11 @@ class EvidenceValidationService:
                 recommendation,
                 *claims,
             ),
+            findings=findings,
+        )
+        self._check_conflicting_evidence(
+            workflow_id=workflow_id,
+            evidence_records=evidence_records,
             findings=findings,
         )
         self._check_claims(
@@ -205,6 +219,112 @@ class EvidenceValidationService:
                         target=CorrectionTarget.ORCHESTRATOR,
                     )
                 )
+
+    @staticmethod
+    def _check_conflicting_evidence(
+        *,
+        workflow_id: UUID,
+        evidence_records: list[ExtractedEvidence],
+        findings: list[ValidationFinding],
+    ) -> None:
+        """Flag evidence that disagrees about what should be one fact.
+
+        Per specs/source-policy.md section 11 ("Conflicting Sources"),
+        a material conflict must be disclosed and reduce confidence,
+        not be silently resolved by picking a value. This groups
+        evidence by candidate, metric, and reporting period, and flags
+        any group reporting more than one distinct value. The severity
+        is WARNING, not BLOCKING: the finding still reaches the report
+        as something a human must review, but it does not by itself
+        stop a workflow that has other usable evidence from reaching a
+        recommendation.
+
+        Grouping by metric reuses `FinancialDataTool.resolve_metric_row`
+        (the same keyword mapping the yfinance fallback uses) rather
+        than matching `evidence_type` verbatim — different extraction
+        passes label the same fact inconsistently ("Fiscal Year
+        Revenue" vs. "Fiscal Year Revenue Data"), and an exact-string
+        grouping missed a real conflict during live testing because of
+        exactly that variance. Reporting-period grouping is still an
+        exact match, not a granularity-aware one — a conservative
+        first pass, not full conflict resolution.
+        """
+
+        metric_tool = FinancialDataTool()
+        groups: dict[tuple[str, str, str], list[ExtractedEvidence]] = {}
+
+        for record in evidence_records:
+            if record.reported_value is None or not record.candidate_name:
+                continue
+
+            metric_key = (
+                metric_tool.resolve_metric_row(record.evidence_type)
+                or record.evidence_type.casefold()
+            )
+            key = (
+                record.candidate_name.casefold(),
+                metric_key,
+                (record.reporting_period or "").casefold(),
+            )
+            groups.setdefault(key, []).append(record)
+
+        for (_candidate_key, metric_key, _period), records in groups.items():
+            distinct_values = {
+                record.reported_value
+                for record in records
+                if record.reported_value is not None
+            }
+
+            if len(distinct_values) <= 1:
+                continue
+
+            if not EvidenceValidationService._is_material_conflict(
+                distinct_values
+            ):
+                continue
+
+            findings.append(
+                EvidenceValidationService._finding(
+                    workflow_id=workflow_id,
+                    category=ValidationCategory.UNDISCLOSED_CONFLICT,
+                    severity=ValidationSeverity.WARNING,
+                    candidate_name=records[0].candidate_name,
+                    description=(
+                        f"Sources disagree on {metric_key} for "
+                        f"{records[0].candidate_name}: reported "
+                        f"values {sorted(str(value) for value in distinct_values)}."
+                    ),
+                    correction=(
+                        "Disclose the conflicting values in the report "
+                        "and do not silently prefer one without "
+                        "justification."
+                    ),
+                    evidence_ids=[record.evidence_id for record in records],
+                    target=CorrectionTarget.FINANCIAL_ANALYSIS,
+                )
+            )
+
+    @staticmethod
+    def _is_material_conflict(values: set[Decimal]) -> bool:
+        """Return whether a set of reported values disagree materially.
+
+        Compares the widest spread in the group (max vs. min) against
+        `_CONFLICT_MATERIALITY_THRESHOLD` as a fraction of the smaller
+        value. A min of zero can't produce a meaningful ratio; any
+        nonzero disagreement against a reported zero is treated as
+        material, since there's no tolerance band to compare it to.
+        """
+
+        min_value = min(values)
+        max_value = max(values)
+
+        if min_value == 0:
+            return max_value != 0
+
+        return (
+            abs(max_value - min_value) / abs(min_value)
+            > _CONFLICT_MATERIALITY_THRESHOLD
+        )
 
     def _check_claims(
         self,

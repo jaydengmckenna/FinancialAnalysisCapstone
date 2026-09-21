@@ -238,6 +238,190 @@ def test_text_supported_rejects_unrelated_evidence() -> None:
     assert EvidenceValidationService._text_supported(claim, evidence) is False
 
 
+def _make_evidence(
+    *,
+    workflow_id,
+    source_id,
+    value: Decimal,
+    candidate_name: str = "Alpha",
+    evidence_type: str = "revenue",
+    reporting_period: str = "FY2025",
+) -> ExtractedEvidence:
+    return ExtractedEvidence(
+        workflow_id=workflow_id,
+        source_id=source_id,
+        candidate_name=candidate_name,
+        evidence_type=evidence_type,
+        content=f"{candidate_name} reported {value} for {reporting_period}.",
+        reported_value=value,
+        currency="USD",
+        unit="million",
+        reporting_period=reporting_period,
+    )
+
+
+def test_conflicting_evidence_flags_different_values_for_same_fact() -> None:
+    """Two sources reporting different values for the same candidate,
+    metric, and period must be flagged as an undisclosed conflict."""
+
+    workflow_id = uuid4()
+    source_id = uuid4()
+    findings: list = []
+
+    EvidenceValidationService._check_conflicting_evidence(
+        workflow_id=workflow_id,
+        evidence_records=[
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("110")),
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("245")),
+        ],
+        findings=findings,
+    )
+
+    assert len(findings) == 1
+    assert findings[0].category == ValidationCategory.UNDISCLOSED_CONFLICT
+    assert findings[0].severity == "warning"
+
+
+def test_conflicting_evidence_ignores_matching_values() -> None:
+    """Two sources corroborating the same value must not be flagged."""
+
+    workflow_id = uuid4()
+    source_id = uuid4()
+    findings: list = []
+
+    EvidenceValidationService._check_conflicting_evidence(
+        workflow_id=workflow_id,
+        evidence_records=[
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("110")),
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("110")),
+        ],
+        findings=findings,
+    )
+
+    assert not findings
+
+
+def test_conflicting_evidence_ignores_values_within_materiality_threshold() -> None:
+    """Values within the 5% tolerance (e.g. a rounded headline figure
+    vs. an exact 10-K figure) are ordinary precision variance, not a
+    conflict worth interrupting a human reviewer over."""
+
+    workflow_id = uuid4()
+    source_id = uuid4()
+    findings: list = []
+
+    EvidenceValidationService._check_conflicting_evidence(
+        workflow_id=workflow_id,
+        evidence_records=[
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("245")),
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("245.122")),
+        ],
+        findings=findings,
+    )
+
+    assert not findings
+
+
+def test_conflicting_evidence_flags_values_beyond_materiality_threshold() -> None:
+    """Values more than 5% apart are a material conflict, even when
+    each individual value looks like a plausible real figure on its
+    own — this is the exact pattern a live run surfaced (one source's
+    $245B vs. another's $281.7B, both labeled the same fiscal year)."""
+
+    workflow_id = uuid4()
+    source_id = uuid4()
+    findings: list = []
+
+    EvidenceValidationService._check_conflicting_evidence(
+        workflow_id=workflow_id,
+        evidence_records=[
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("245")),
+            _make_evidence(workflow_id=workflow_id, source_id=source_id, value=Decimal("281.7")),
+        ],
+        findings=findings,
+    )
+
+    assert len(findings) == 1
+
+
+def test_conflicting_evidence_ignores_different_periods() -> None:
+    """Different values for genuinely different periods are not a
+    conflict — that's ordinary year-over-year change."""
+
+    workflow_id = uuid4()
+    source_id = uuid4()
+    findings: list = []
+
+    EvidenceValidationService._check_conflicting_evidence(
+        workflow_id=workflow_id,
+        evidence_records=[
+            _make_evidence(
+                workflow_id=workflow_id, source_id=source_id,
+                value=Decimal("100"), reporting_period="FY2024",
+            ),
+            _make_evidence(
+                workflow_id=workflow_id, source_id=source_id,
+                value=Decimal("110"), reporting_period="FY2025",
+            ),
+        ],
+        findings=findings,
+    )
+
+    assert not findings
+
+
+def test_conflicting_evidence_warning_does_not_block_approval() -> None:
+    """An undisclosed-conflict finding is a WARNING, not a BLOCKING
+    finding — it must reach the report for human review without
+    preventing an otherwise-supported recommendation from being
+    approved."""
+
+    context = make_context()
+    claim = ValidationClaim(
+        workflow_id=context["workflow_id"],
+        text="Alpha revenue growth was 10.00 percent.",
+        candidate_name="Alpha",
+        source_ids=[context["source"].source_id],
+        evidence_ids=[
+            context["current"].evidence_id,
+            context["previous"].evidence_id,
+        ],
+        calculation_id=context["calculation"].calculation_id,
+        expected_value=Decimal("10.00"),
+        expected_unit="percent",
+        expected_reporting_periods=["FY2024", "FY2025"],
+    )
+    conflicting_evidence = _make_evidence(
+        workflow_id=context["workflow_id"],
+        source_id=context["source"].source_id,
+        value=Decimal("999"),
+        reporting_period="FY2025",
+    )
+
+    service = EvidenceValidationService()
+    result = service.validate(
+        research_request=context["request"],
+        investor_profile=context["profile"],
+        research_plan=context["plan"],
+        source_records=[context["source"]],
+        evidence_records=[
+            context["current"],
+            context["previous"],
+            conflicting_evidence,
+        ],
+        calculations=[context["calculation"]],
+        candidate_analyses=[context["analysis"]],
+        recommendation=context["recommendation"],
+        claims=[claim],
+    )
+
+    assert result.outcome == ValidationOutcome.APPROVED
+    assert any(
+        finding.category == ValidationCategory.UNDISCLOSED_CONFLICT
+        for finding in result.findings
+    )
+
+
 def test_supported_calculated_claim_is_approved() -> None:
     """A claim matching its calculation and evidence should pass."""
 
@@ -359,6 +543,40 @@ def test_unsafe_recommendation_is_rejected() -> None:
     assert result.outcome == ValidationOutcome.REJECTED
     assert any(
         finding.category == ValidationCategory.HUMAN_REVIEW_BOUNDARY_FAILURE
+        for finding in result.findings
+    )
+
+
+def test_recommendation_without_material_risks_requires_correction() -> None:
+    """A recommendation that discloses no material risks at all must
+    be blocked rather than silently approved."""
+
+    context = make_context()
+    context["recommendation"].material_risks = []
+    claim = ValidationClaim(
+        workflow_id=context["workflow_id"],
+        text="Alpha revenue grew.",
+        candidate_name="Alpha",
+        source_ids=[context["source"].source_id],
+        evidence_ids=[context["current"].evidence_id],
+    )
+
+    result = EvidenceValidationService().validate(
+        research_request=context["request"],
+        investor_profile=context["profile"],
+        research_plan=context["plan"],
+        source_records=[context["source"]],
+        evidence_records=[context["current"], context["previous"]],
+        calculations=[context["calculation"]],
+        candidate_analyses=[context["analysis"]],
+        recommendation=context["recommendation"],
+        claims=[claim],
+    )
+
+    assert result.outcome == ValidationOutcome.ANALYSIS_CORRECTION_REQUIRED
+    assert any(
+        finding.category == ValidationCategory.MISSING_RISK_OR_LIMITATION
+        and finding.severity == "error"
         for finding in result.findings
     )
 

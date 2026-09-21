@@ -289,7 +289,13 @@ class FinancialAnalysisAgent(ToolCallingAgent):
                     source_id=source.source_id,
                     candidate_name=requirement.candidate_name,
                     evidence_requirement_id=requirement.requirement_id,
-                    evidence_type="financial_metric",
+                    # The specific resolved metric name ("Total
+                    # Revenue"), not a generic placeholder — evidence
+                    # from web search already reflects the real metric
+                    # in its own evidence_type, and grouping evidence
+                    # for conflict detection depends on both sides
+                    # resolving to the same canonical metric.
+                    evidence_type=data_point.metric_name,
                     content=(
                         f"{data_point.company_name} reported "
                         f"{data_point.metric_name} of {data_point.value} "
