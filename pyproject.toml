@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fin-automation"
+version = "0.1.0"
+description = "Agentic Financial Analysis Automation"
+requires-python = ">=3.12"
+
+[tool.setuptools.packages.find]
+where = ["src"]

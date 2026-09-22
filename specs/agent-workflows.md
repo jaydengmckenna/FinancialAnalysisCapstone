@@ -62,16 +62,16 @@ The primary workflow order is:
 2. Intake validation.
 3. Clarification when required.
 4. Research planning.
-5. Web search.
-6. Source selection.
-7. Webpage retrieval.
-8. HTML parsing and evidence extraction.
-9. Financial analysis and calculations.
-10. Evidence validation.
-11. Report writing.
-12. Structural report validation.
-13. Markdown file writing.
-14. Human review.
+5. Web search and source selection (Tavily returns each result's raw
+   page content in the same search response — see
+   `constitution/techstack.md`).
+6. Evidence extraction.
+7. Financial analysis and calculations.
+8. Evidence validation.
+9. Report writing.
+10. Structural report validation.
+11. Markdown file writing.
+12. Human review.
 
 ### Routing Outcomes
 
@@ -222,9 +222,13 @@ The Web Search Tool executes approved search queries and returns structured
 The Evidence-Lookup Tool retrieves existing source and evidence records
 from the current workflow.
 
-Duplicate URL detection, URL normalization, basic domain checks, HTTP
-retrieval, and HTML parsing shall be performed by deterministic Python
-functions.
+Tavily returns each result's raw page content directly in the same
+search call, so there is no separate HTTP-retrieval or HTML-parsing
+stage. Duplicate-source avoidance is handled by the Source Selection
+Agent's own judgment (its system prompt instructs it not to treat
+same-publisher or same-domain results as independent corroboration
+without materially distinct reporting) rather than a deterministic
+check.
 
 ### Responsibilities
 
@@ -592,8 +596,7 @@ The Financial Analysis Agent does not:
 
 - Search the web.
 - Select sources for retrieval.
-- Retrieve or parse webpages.
-- Scrape raw webpage content.
+- Extract evidence from a source's Tavily-retrieved content.
 - Invent missing financial values.
 - Perform important arithmetic through language-model reasoning.
 - Treat incompatible data as directly comparable.

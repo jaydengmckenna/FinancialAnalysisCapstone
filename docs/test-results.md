@@ -63,8 +63,16 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 ```bash
 python -m venv .venv
 .venv/bin/pip install -r requirements.txt
+.venv/bin/pip install -e . --no-deps
 .venv/bin/pytest -v
 ```
+
+The `pip install -e .` step is required — `fin_automation` is a
+`src/`-layout package, and `requirements.txt` alone does not make it
+importable. This was a real gap found during Phase 11 (`pyproject.toml`
+was empty): verified by testing `requirements.txt`-only installation in
+a genuinely clean virtual environment, which failed with 28 collection
+errors before `pyproject.toml` was given real packaging metadata.
 
 No `.env` file or live credentials are required to run the suite —
 only to run `main.py`/`run_smoke_test.py` against real services.

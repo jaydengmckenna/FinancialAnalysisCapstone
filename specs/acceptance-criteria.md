@@ -823,7 +823,7 @@ Maps to:
 The repository shall contain:
 
 - `constitution/mission.md`
-- `constitution/tech-stack.md`
+- `constitution/techstack.md`
 - `constitution/roadmap.md`
 
 ### AC-121: Specifications Present
@@ -857,15 +857,23 @@ implementation.
 ### AC-125: AI-Assistance Artifact Present
 
 The repository shall contain selected prompt examples and decision
-rationale in `COPILOT.md` or the approved AI-assistance documentation.
+rationale in `CLAUDE.md` (renamed from `COPILOT.md` — the AI assistance
+used throughout this project was Claude Code, not GitHub Copilot) or the
+approved AI-assistance documentation.
 
 ### AC-126: Example Outputs Present
 
-The repository shall contain:
+The repository shall contain, in `docs/examples/`, real, unedited Markdown
+reports from live runs, each self-contained with its own cited sources —
+not a separate structured (e.g. JSON) artifact alongside it, since no
+such artifact is produced by the implemented system (the formal
+`WorkflowState`/`StageResult` contracts were deliberately descoped; see
+`docs/design-tradeoffs.md` §1). At minimum:
 
-- An example financial research article.
-- An example investment recommendation report.
-- Supporting structured artifacts.
+- An example investment recommendation report reaching a qualified
+  recommendation.
+- An example insufficient-evidence report, where no supported
+  recommendation could be reached.
 
 ## Phase 2 Completion Criteria
 

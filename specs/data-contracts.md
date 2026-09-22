@@ -670,7 +670,11 @@ Represents the Source Selection Agent's complete source-selection decision.
 
 ### Purpose
 
-Records the result of retrieving one selected webpage.
+Records the result of retrieving one selected webpage. Tavily returns
+raw page content directly in the same search call used for source
+selection, so there is no separate retrieval step in the implemented
+system — this contract exists in the schema but is not constructed by
+any current agent or tool.
 
 ### Fields
 
@@ -689,17 +693,15 @@ Records the result of retrieving one selected webpage.
 
 - Successful retrieval requires a final URL and retrieval timestamp.
 - Failed retrieval requires an error message.
-- Unsupported content shall not proceed to HTML parsing.
 - Secret values shall not appear in error messages.
 
 ### Produced By
 
-- Deterministic webpage-retrieval function.
+- Not produced in the implemented system; see Purpose above.
 
 ### Consumed By
 
-- Orchestrator.
-- HTML parser.
+- Not consumed in the implemented system; see Purpose above.
 
 ## SourceRecord
 

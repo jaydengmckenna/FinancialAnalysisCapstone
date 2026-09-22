@@ -2109,7 +2109,10 @@ Phase 10 depends on completion of Phase 9.
 
 ### Status
 
-Not Started
+In Progress. Every deliverable and exit criterion below is met except
+submission-ready packaging, deliberately deferred until immediately
+before actual submission (this work is not yet committed to version
+control — see the note under Exit Criteria).
 
 ### Goal
 
@@ -2118,19 +2121,39 @@ prepare the project for evaluation.
 
 ### Planned Deliverables
 
-- Completed `README.md`.
-- Completed constitution.
-- Completed specifications.
-- Final architecture documentation.
-- Final Mermaid source and PNG diagram.
-- Happy-path and adversarial tests.
-- Prompt and decision journal.
-- `COPILOT.md`.
-- Example research report.
-- Example insufficient-evidence report.
-- Test-results artifact.
-- Final repository review.
-- Submission-ready project repository or archive.
+- [x] Completed `README.md`. Full rewrite against all 16 Completion
+      Areas below.
+- [x] Completed constitution. Unchanged since Phase 1.
+- [x] Completed specifications. Unchanged since Phase 2, cross-verified
+      against implementation via `docs/traceability-mapping.md`.
+- [x] Final architecture documentation. `docs/architecture.md` refreshed
+      to match the current implementation (was stale since before
+      Phase 9 finished).
+- [x] Final Mermaid source and PNG diagram. `docs/architecture.mmd`
+      refreshed to match the current implementation; `docs/architecture.png`
+      manually re-exported from it (no Mermaid renderer is available
+      in this development environment, so this step was done outside
+      it).
+- [x] Happy-path and adversarial tests. Completed in Phase 10.
+- [x] Prompt and decision journal, satisfied by `CLAUDE.md` (renamed
+      from `COPILOT.md` — the actual AI assistance used throughout this
+      project was Claude Code, not GitHub Copilot). Per
+      `specs/acceptance-criteria.md` AC-125, these are the same
+      deliverable, not two separate artifacts.
+- [x] Example research report. Three live, unedited reports
+      (`docs/examples/`): strong growth (NVIDIA), modest growth
+      (Apple), and a decline (Nike) — chosen specifically to show the
+      system doesn't only report favorable outcomes.
+- [x] Example insufficient-evidence report. A fourth live run
+      (National Presto Industries, free cash flow growth — a metric
+      outside the deterministic yfinance fallback's coverage, for a
+      thinly-covered small-cap) genuinely produced an
+      `insufficient_evidence` result rather than being staged; see
+      `docs/examples/README.md`.
+- [x] Test-results artifact. `docs/test-results.md`, updated through
+      Phase 10 and Phase 11's `pyproject.toml`/clean-install fix.
+- [ ] Final repository review.
+- [ ] Submission-ready project repository or archive.
 
 ### README Completion Areas
 
@@ -2170,18 +2193,43 @@ The project will preserve selected examples showing:
 
 Phase 11 is complete when:
 
-- Every required capstone artifact is present.
-- README instructions match the implementation.
-- The architecture diagram matches the implemented high-level workflow.
-- Specifications match implemented behavior.
-- Test instructions work in a clean environment.
-- Example outputs contain citations, risks, limitations, and human-review
-  language.
-- Secret credentials are absent.
-- Virtual environments, caches, and temporary files are excluded.
-- Required files are committed to version control.
-- The repository can be reviewed without undocumented context.
-- The final submission contains current files.
+- [x] Every required capstone artifact is present. Verified against
+      `specs/acceptance-criteria.md` §13 (AC-120–126) during the final
+      repository review.
+- [x] README instructions match the implementation. Every command in
+      `README.md` (install, test, run) was actually tested, including
+      in a genuinely clean virtual environment.
+- [x] The architecture diagram matches the implemented high-level
+      workflow. `docs/architecture.mmd`/`.png` both refreshed.
+- [x] Specifications match implemented behavior. `specs/agent-workflows.md`
+      and `specs/data-contracts.md` updated to remove the superseded
+      HTML-retrieval/parsing description; `docs/traceability-mapping.md`
+      covers `specs/functional-requirements.md`.
+- [x] Test instructions work in a clean environment. A real gap was
+      found and fixed here: `pyproject.toml` was empty, so
+      `requirements.txt` alone did not make `fin_automation` importable.
+      Verified fixed in a genuinely clean venv (356/356 passing).
+- [x] Example outputs contain citations, risks, limitations, and
+      human-review language. Verified across all four reports in
+      `docs/examples/`.
+- [x] Secret credentials are absent. Verified: `.env` is gitignored and
+      untracked; no key-shaped strings in any tracked or new file.
+- [x] Virtual environments, caches, and temporary files are excluded.
+      Verified: nothing under `.venv/`, `__pycache__/`, or
+      `.pytest_cache/` is tracked.
+- [ ] Required files are committed to version control. Not yet — every
+      change described in this Phase 11 section is currently an
+      uncommitted working-tree edit, per the project owner's explicit
+      instruction that all `git add`/`git commit` be done manually by
+      them, not by Claude Code. This is the one remaining action before
+      this criterion is met.
+- [x] The repository can be reviewed without undocumented context.
+      Verified during the final repository review (broken-link check,
+      spec-drift spot checks, no dangling references found).
+- [ ] The final submission contains current files. Deferred with
+      submission packaging (see Planned Deliverables) — deliberately
+      left until immediately before actual submission, not because
+      anything is unresolved now.
 
 ### Dependencies
 
@@ -2292,23 +2340,20 @@ Roadmap updates shall follow these rules:
 | 0.4 | Phases 3 and 4 | Completed data contracts, agent workflows, architecture documentation, and the architecture diagram. Began project setup and Pydantic implementation. | Phase 3 deliverables and exit criteria were satisfied. |
 | 0.5 | Phases 5 through 8 | Refined future implementation phases to match the approved five-agent architecture and reduced financial tool set. | Phase 3 clarified the actual component boundaries, contracts, tools, and outputs. |
 | 0.6 | Phase 9 | Marked Phase 9 Completed. Fixed evidence-retry accumulation, evidence-coverage checks (percentage and wrong-period data), a citation tokenizer false rejection, and a fixed non-varying candidate score; added `WorkflowError` handling in `main.py`; formally descoped `WorkflowState`/`StageResult`/`ValidationCorrectionRouter` integration. | Live QA passes on 2026-09-17 found and resolved the remaining defects blocking a genuine `qualified_recommendation`, and the remaining open Phase 9 item needed a documented decision rather than staying open indefinitely. See `docs/design-tradeoffs.md`. |
+| 0.7 | Phase 10 | Marked Phase 10 Completed. Built the full unit/happy-path/adversarial/end-to-end test suite (356 tests), implemented evidence-conflict detection, fixed a `ReportWriterTool` `OSError` gap, mapped all 114 functional requirements to tests (`docs/traceability-mapping.md`), and recorded `docs/test-results.md`. | Live QA and design review during Phase 9 close-out surfaced real, previously-undocumented gaps (missing adversarial coverage, an unhandled file-write failure) that needed structured verification rather than staying implicit. |
+| 0.8 | Phase 11 | Refreshed `docs/architecture.md`/`.mmd`/`.png`, wrote `CLAUDE.md` (renamed from `COPILOT.md`), fully rewrote `README.md`, fixed a clean-environment install gap (`pyproject.toml` was empty), added `.env.example`, produced four real example reports (`docs/examples/`), and updated `specs/agent-workflows.md`/`data-contracts.md`/`acceptance-criteria.md` to remove superseded HTML-retrieval/parsing and `RetrievalResult` descriptions. Not yet committed to version control (deliberate — commits in this project are made manually by the project owner). | Final repository review for submission readiness surfaced several real gaps (stale docs, a broken clean-install path, missing AC-111 example config) that needed fixing, not just noting. |
 
 ## Next Planned Work
 
 The active phase is:
 
 ```text
-Phase 10: Testing and Quality Verification
+Phase 11: Documentation and Submission Preparation
 ```
 
-The first implementation work will be:
+The remaining work is:
 
-1. Build the unit-test, happy-path, failure-path, and adversarial
-   suites described in the Phase 10 section below.
-2. Map major functional requirements to specific tests or acceptance
-   checks.
-3. Mock external dependencies (OpenAI, Tavily, yfinance) so the suite
-   is repeatable without live API calls.
-4. Save fixtures supporting repeatable scraping tests.
-5. Record test results as a project artifact and complete the final
-   acceptance review.
+1. Commit all Phase 11 changes to version control.
+2. Walk through the codebase with the project owner before submission.
+3. Package the repository for submission (the one remaining Phase 11
+   deliverable).
