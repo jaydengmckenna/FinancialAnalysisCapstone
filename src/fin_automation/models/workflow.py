@@ -23,7 +23,7 @@ class WorkflowBaseModel(BaseModel):
     )
 
 
-class WorkflowError(WorkflowBaseModel):
+class WorkflowErrorRecord(WorkflowBaseModel):
     """One structured error produced during workflow execution."""
 
     error_id: UUID = Field(default_factory=uuid4)
@@ -55,7 +55,7 @@ class WorkflowError(WorkflowBaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_workflow_error(self) -> "WorkflowError":
+    def validate_workflow_error(self) -> "WorkflowErrorRecord":
         """Validate retry and recoverability behavior."""
 
         if self.retry_allowed and not self.recoverable:
@@ -90,7 +90,7 @@ class StageResult(WorkflowBaseModel):
     started_at: datetime
     completed_at: datetime | None = None
     produced_record_ids: list[UUID] = Field(default_factory=list)
-    errors: list[WorkflowError] = Field(default_factory=list)
+    errors: list[WorkflowErrorRecord] = Field(default_factory=list)
     summary: str | None = None
 
     @field_validator("started_at", "completed_at")
@@ -196,7 +196,7 @@ class WorkflowState(WorkflowBaseModel):
     )
     completed_at: datetime | None = None
     stage_results: list[StageResult] = Field(default_factory=list)
-    workflow_errors: list[WorkflowError] = Field(default_factory=list)
+    workflow_errors: list[WorkflowErrorRecord] = Field(default_factory=list)
     retry_counts: dict[WorkflowStage, int] = Field(default_factory=dict)
     intake_result_id: UUID | None = None
     research_plan_id: UUID | None = None

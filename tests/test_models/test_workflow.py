@@ -14,7 +14,7 @@ from fin_automation.models.common import (
 )
 from fin_automation.models.workflow import (
     StageResult,
-    WorkflowError,
+    WorkflowErrorRecord,
     WorkflowState,
 )
 
@@ -22,10 +22,10 @@ from fin_automation.models.workflow import (
 def create_recoverable_error(
     workflow_id: UUID,
     stage: WorkflowStage = WorkflowStage.WEB_RETRIEVAL,
-) -> WorkflowError:
+) -> WorkflowErrorRecord:
     """Create a valid recoverable workflow error."""
 
-    return WorkflowError(
+    return WorkflowErrorRecord(
         workflow_id=workflow_id,
         stage=stage,
         severity=ErrorSeverity.ERROR,
@@ -41,10 +41,10 @@ def create_recoverable_error(
 def create_critical_error(
     workflow_id: UUID,
     stage: WorkflowStage = WorkflowStage.EVIDENCE_VALIDATION,
-) -> WorkflowError:
+) -> WorkflowErrorRecord:
     """Create a valid nonrecoverable critical error."""
 
-    return WorkflowError(
+    return WorkflowErrorRecord(
         workflow_id=workflow_id,
         stage=stage,
         severity=ErrorSeverity.CRITICAL,
@@ -85,7 +85,7 @@ def test_workflow_error_accepts_recoverable_error() -> None:
 
 def test_nonrecoverable_error_rejects_retry() -> None:
     with pytest.raises(ValidationError, match="nonrecoverable error cannot allow retry"):
-        WorkflowError(
+        WorkflowErrorRecord(
             workflow_id=uuid4(),
             stage=WorkflowStage.WEB_RETRIEVAL,
             severity=ErrorSeverity.ERROR,
@@ -98,7 +98,7 @@ def test_nonrecoverable_error_rejects_retry() -> None:
 
 def test_positive_retry_count_requires_retry_allowed() -> None:
     with pytest.raises(ValidationError, match="positive retry count requires retry_allowed"):
-        WorkflowError(
+        WorkflowErrorRecord(
             workflow_id=uuid4(),
             stage=WorkflowStage.WEB_RETRIEVAL,
             severity=ErrorSeverity.ERROR,
@@ -112,7 +112,7 @@ def test_positive_retry_count_requires_retry_allowed() -> None:
 
 def test_critical_error_cannot_be_recoverable() -> None:
     with pytest.raises(ValidationError, match="critical workflow error cannot be recoverable"):
-        WorkflowError(
+        WorkflowErrorRecord(
             workflow_id=uuid4(),
             stage=WorkflowStage.EVIDENCE_VALIDATION,
             severity=ErrorSeverity.CRITICAL,
@@ -389,7 +389,7 @@ def test_workflow_models_reject_unknown_fields() -> None:
 
 def test_workflow_error_serialization_round_trip() -> None:
     error = create_recoverable_error(uuid4())
-    reconstructed = WorkflowError.model_validate_json(error.model_dump_json())
+    reconstructed = WorkflowErrorRecord.model_validate_json(error.model_dump_json())
     assert reconstructed == error
 
 

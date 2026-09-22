@@ -1281,11 +1281,16 @@ Represents the structured JSON record of the completed workflow.
 
 # 9. Workflow Contracts
 
-## WorkflowError
+## WorkflowErrorRecord
 
 ### Purpose
 
-Represents a structured workflow failure.
+Represents a structured workflow failure. Named `WorkflowErrorRecord` in
+the implementation (`fin_automation.models.workflow.WorkflowErrorRecord`),
+distinct from the actual exception class raised at runtime
+(`fin_automation.exceptions.WorkflowError`) — the two originally shared
+a name, which was confusing since only the exception is live; this
+contract was never wired in (see `docs/design-tradeoffs.md` §1).
 
 ### Fields
 
@@ -1318,7 +1323,7 @@ Records the completion status and output identifiers of one workflow stage.
 - `stage: WorkflowStage`
 - `status: WorkflowStatus`
 - `output_record_ids: list[UUID]`
-- `errors: list[WorkflowError]`
+- `errors: list[WorkflowErrorRecord]`
 - `started_at: datetime`
 - `completed_at: datetime | None`
 - `attempt_number: int`
@@ -1420,7 +1425,7 @@ ReportArtifact
 WorkflowArtifact
 ```
 
-`WorkflowState`, `StageResult`, `WorkflowError`, and
+`WorkflowState`, `StageResult`, `WorkflowErrorRecord`, and
 `AdditionalResearchRequest` operate across the primary handoff.
 
 # 11. Implementation Organization

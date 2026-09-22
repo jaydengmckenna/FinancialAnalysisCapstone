@@ -166,8 +166,11 @@ To capture a full run's console output alongside the report:
 .venv/bin/pytest -v
 ```
 
-356 tests, fully offline — OpenAI, Tavily, and yfinance are all mocked,
-so no credentials or network access are required to run the suite. See
+356 tests, no live API calls or network access — OpenAI, Tavily, and
+yfinance are all mocked. A `.env` file with non-empty values is still
+required for Pydantic settings validation to pass (see
+`docs/test-results.md`); the values don't need to work, since nothing
+in the suite actually calls out to a real service. See
 [`docs/test-results.md`](docs/test-results.md) for a saved run and
 per-file breakdown, and
 [`docs/traceability-mapping.md`](docs/traceability-mapping.md) for how

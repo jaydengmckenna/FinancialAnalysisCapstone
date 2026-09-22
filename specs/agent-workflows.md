@@ -557,7 +557,7 @@ The Financial Analysis Agent shall produce:
 - One preliminary `RecommendationResult`.
 - An `AdditionalResearchRequest` when more evidence may resolve a material
   gap.
-- A structured `WorkflowError` when analysis cannot continue.
+- A structured `WorkflowErrorRecord` when analysis cannot continue.
 
 The preliminary recommendation shall not proceed to report generation until
 it passes evidence validation.
@@ -838,7 +838,7 @@ The Evidence Validation Agent shall produce:
 - One validated `ValidationResult`.
 - One or more `ValidationFinding` objects when issues exist.
 - Any required `AdditionalResearchRequest`.
-- Any validation-stage `WorkflowError`.
+- Any validation-stage `WorkflowErrorRecord`.
 
 An approved `ValidationResult` shall identify the candidate analyses,
 recommendation result, calculations, evidence, and sources approved for

@@ -355,7 +355,7 @@ Important approved contracts include:
 - `ReportDraft`
 - `ReportArtifact`
 - `WorkflowState`
-- `WorkflowError`
+- `WorkflowErrorRecord`
 
 ### Approved Architecture Flow
 
@@ -738,7 +738,7 @@ Implementation:
 
 Contracts:
 
-- `WorkflowError`
+- `WorkflowErrorRecord`
 - `StageResult`
 - `WorkflowState`
 

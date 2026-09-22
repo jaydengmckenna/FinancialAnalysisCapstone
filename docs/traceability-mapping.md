@@ -187,8 +187,8 @@ requirements below predate that decision.
 | FR-102 | Validate Stage Input | Covered | `ValueError` raised at each stage boundary, e.g. `_validate_source_selection_identity`. |
 | FR-103 | Validate Stage Output | Covered | Pydantic validation at every stage transition. |
 | FR-104 | Stop Invalid Downstream Processing | Covered | `test_create_research_plan_stops_incomplete_intake`; `_run_with_retries` raising `WorkflowError`; `test_search_and_select_raises_when_agent_never_submits`, `test_extract_evidence_rejects_source_outside_extraction_scope`. |
-| FR-105 | Distinguish Recoverable Failures | Covered | `ValueError` (recoverable, retried) vs. `WorkflowError` (unrecoverable) distinction; `test_nonrecoverable_error_rejects_retry` |
-| FR-106 | Record Workflow Failures | Covered | `logger.error`/`logger.warning` throughout `orchestrator.py`; `WorkflowError` model. |
+| FR-105 | Distinguish Recoverable Failures | Partial | The distinction is real at runtime — `_run_with_retries` retries `ValueError` (recoverable) and raises the actual `fin_automation.exceptions.WorkflowError` after 3 exhausted attempts (unrecoverable) — but no test actually exercises that exhaustion path. `test_nonrecoverable_error_rejects_retry` was previously cited here; it doesn't test this at all — it tests an unrelated Pydantic validation rule on `WorkflowErrorRecord` (`models/workflow.py`), a same-named-until-this-pass, unused data contract. **(new finding — found by mis-citation, see summary)** |
+| FR-106 | Record Workflow Failures | Partial | `logger.error`/`logger.warning` calls throughout `orchestrator.py` genuinely record failures. The structured `WorkflowErrorRecord` model (`models/workflow.py`) that would give this a queryable, structured form is never constructed anywhere in the live pipeline — part of the same `WorkflowState` descoping as `docs/design-tradeoffs.md` §1. Log lines are the only real mechanism. |
 | FR-107 | Avoid Silent Failure | Covered | `main.py`'s `WorkflowError` catch and `ReportWriterTool`'s `OSError` catch — both fixed during this Phase 10 pass; `test_unrecoverable_workflow_error_exits_cleanly`, `test_forward_reports_file_write_failure_as_value_error`. |
 | FR-108 | Complete with Validated Output | Covered | Same "only validated results proceed" design as FR-099. |
 
@@ -212,8 +212,8 @@ requirements below predate that decision.
 
 Of 114 requirements:
 
-- **~90 Covered** — verified by a specific, named test.
-- **~13 Partial** — some aspect tested, a real gap documented inline.
+- **~88 Covered** — verified by a specific, named test.
+- **~15 Partial** — some aspect tested, a real gap documented inline.
 - **~11 N/A** — 9 describe the pre-Phase-5B/5C retrieval architecture, superseded by the Tavily-only approach; 2 (FR-063, FR-073) describe multi-candidate comparison, reserved schema for a feature outside the project's current single-candidate scope.
 - **~2 Not automated** — true by live verification or by construction, not practical to unit test (e.g. "supports varied research topics").
 
@@ -223,5 +223,18 @@ Of 114 requirements:
 2. **FR-019**: no test pins the research-planning prompt's "don't presuppose a winner" instruction, unlike the equivalent report-writing instruction.
 3. **FR-028**: `TavilySearchTool`'s `ResearchError`-raising failure path (a malformed/failed Tavily response, as opposed to an empty-but-valid one) has no dedicated test.
 4. **FR-068**: no test verifies the system avoids false precision in a ranking claim.
+5. **FR-105**: the real retry-exhaustion path (`_run_with_retries` raising
+   `fin_automation.exceptions.WorkflowError` after 3 failed attempts) has
+   no dedicated test. This row previously cited
+   `test_nonrecoverable_error_rejects_retry` as covering it; that test
+   actually exercises an unrelated validation rule on
+   `WorkflowErrorRecord` (`models/workflow.py`) — a Pydantic model that,
+   until this pass, shared its name with the real exception, and is
+   itself never constructed anywhere in the live pipeline (found and
+   renamed during Phase 11 interview-prep review, 2026-09-23). FR-106
+   downgraded alongside it for the same underlying reason: only
+   `logger.error`/`logger.warning` calls actually record failures at
+   runtime; the structured record model that would back a stronger
+   "Covered" claim doesn't run.
 
 None of these are urgent — the system's core safety behavior (never fabricate, always require human review, block on unsupported claims) is thoroughly covered.

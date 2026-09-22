@@ -13,9 +13,13 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
   a specific commit alone produces this result).
 - **Python:** 3.12.3
 - **Command:** `python -m pytest -v`
-- **External dependencies:** none required. OpenAI, Tavily, and
-  yfinance are all mocked throughout the suite — this result is
-  reproducible without any API credentials or network access.
+- **External dependencies:** no live API calls or network access —
+  OpenAI, Tavily, and yfinance are all mocked throughout the suite.
+  A `.env` file must still exist with non-empty values (real or
+  placeholder) for `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `TAVILY_API_KEY`,
+  and `MODEL_ID`: `ResearchOrchestrator.__init__` calls `get_settings()`
+  unconditionally, even in tests that inject dummy agents for
+  everything else, so Pydantic Settings validation runs regardless.
 
 ## Result
 
@@ -74,8 +78,11 @@ was empty): verified by testing `requirements.txt`-only installation in
 a genuinely clean virtual environment, which failed with 28 collection
 errors before `pyproject.toml` was given real packaging metadata.
 
-No `.env` file or live credentials are required to run the suite —
-only to run `main.py`/`run_smoke_test.py` against real services.
+A `.env` file with non-empty values is required for `pytest` itself to
+collect and run `tests/workflow/test_orchestrator.py` (see above) — the
+values don't need to be real/working ones, since no live call is made,
+but they must be present. Real, working credentials are only required
+to run `main.py`/`run_smoke_test.py` against actual services.
 
 ## Relationship to other project artifacts
 
