@@ -63,7 +63,7 @@ The roadmap uses the following statuses:
 | Phase 8: Markdown Report Generation | Completed |
 | Phase 9: Complete Product Workflow | Completed |
 | Phase 10: Testing and Quality Verification | Completed |
-| Phase 11: Documentation and Submission Preparation | Not Started |
+| Phase 11: Documentation and Submission Preparation | Completed |
 
 ## Current Focus
 
@@ -2109,10 +2109,9 @@ Phase 10 depends on completion of Phase 9.
 
 ### Status
 
-In Progress. Every deliverable and exit criterion below is met except
-submission-ready packaging, deliberately deferred until immediately
-before actual submission (this work is not yet committed to version
-control — see the note under Exit Criteria).
+Completed. All deliverables and exit criteria are met. Submission
+packaging is deliberately deferred until immediately before actual
+submission and does not block this phase from being marked complete.
 
 ### Goal
 
@@ -2217,12 +2216,8 @@ Phase 11 is complete when:
 - [x] Virtual environments, caches, and temporary files are excluded.
       Verified: nothing under `.venv/`, `__pycache__/`, or
       `.pytest_cache/` is tracked.
-- [ ] Required files are committed to version control. Not yet — every
-      change described in this Phase 11 section is currently an
-      uncommitted working-tree edit, per the project owner's explicit
-      instruction that all `git add`/`git commit` be done manually by
-      them, not by Claude Code. This is the one remaining action before
-      this criterion is met.
+- [x] Required files are committed to version control. All Phase 11
+      changes were committed manually by the project owner.
 - [x] The repository can be reviewed without undocumented context.
       Verified during the final repository review (broken-link check,
       spec-drift spot checks, no dangling references found).
@@ -2234,6 +2229,48 @@ Phase 11 is complete when:
 ### Dependencies
 
 Phase 11 depends on completion of Phase 10.
+
+---
+
+## Phase 12: Post-Submission Corrections
+
+### Status
+
+In Progress.
+
+### Goal
+
+Apply corrections identified during the grading interview. Each
+correction is a targeted behavioral fix to the existing implementation;
+no new capabilities are added.
+
+### Planned Deliverables
+
+- [ ] **Same-source evidence deduplication.** When multiple evidence
+      records share the same `domain`, `evidence_type`, and
+      `reporting_period`, keep only the record with the most recent
+      `publication_date`. Records where `publication_date` is `None` on
+      any member of the group are left untouched and handled by the
+      existing conflict-detection logic. Implemented as a pre-pass in
+      Evidence Validation (before conflict detection runs) so no other
+      system is affected. Full domain matching is used (`finance.yahoo.com`
+      not `yahoo.com`) to avoid over-deduplication that would shrink the
+      evidence pool unnecessarily.
+
+### Exit Criteria
+
+Phase 12 is complete when:
+
+- [ ] The deduplication pre-pass is implemented in Evidence Validation.
+- [ ] Existing 356 tests continue to pass.
+- [ ] New tests cover: same-source same-period deduplication (keeps
+      latest), same-source different-period (both kept), ambiguous date
+      (both kept, current logic applies).
+- [ ] `docs/test-results.md` is updated to reflect the new test count.
+
+### Dependencies
+
+Phase 12 depends on completion of Phase 11.
 
 ---
 
@@ -2299,6 +2336,7 @@ The general dependency order is:
 9. Workflow integration connects all components.
 10. Quality verification confirms specification compliance.
 11. Submission preparation completes and verifies the deliverable.
+12. Post-submission corrections apply grading-interview feedback.
 
 A later phase may begin early for exploration, but it shall not be marked
 complete until its dependencies and exit criteria are satisfied.
@@ -2341,19 +2379,24 @@ Roadmap updates shall follow these rules:
 | 0.5 | Phases 5 through 8 | Refined future implementation phases to match the approved five-agent architecture and reduced financial tool set. | Phase 3 clarified the actual component boundaries, contracts, tools, and outputs. |
 | 0.6 | Phase 9 | Marked Phase 9 Completed. Fixed evidence-retry accumulation, evidence-coverage checks (percentage and wrong-period data), a citation tokenizer false rejection, and a fixed non-varying candidate score; added `WorkflowError` handling in `main.py`; formally descoped `WorkflowState`/`StageResult`/`ValidationCorrectionRouter` integration. | Live QA passes on 2026-09-17 found and resolved the remaining defects blocking a genuine `qualified_recommendation`, and the remaining open Phase 9 item needed a documented decision rather than staying open indefinitely. See `docs/design-tradeoffs.md`. |
 | 0.7 | Phase 10 | Marked Phase 10 Completed. Built the full unit/happy-path/adversarial/end-to-end test suite (356 tests), implemented evidence-conflict detection, fixed a `ReportWriterTool` `OSError` gap, mapped all 114 functional requirements to tests (`docs/traceability-mapping.md`), and recorded `docs/test-results.md`. | Live QA and design review during Phase 9 close-out surfaced real, previously-undocumented gaps (missing adversarial coverage, an unhandled file-write failure) that needed structured verification rather than staying implicit. |
-| 0.8 | Phase 11 | Refreshed `docs/architecture.md`/`.mmd`/`.png`, wrote `CLAUDE.md` (renamed from `COPILOT.md`), fully rewrote `README.md`, fixed a clean-environment install gap (`pyproject.toml` was empty), added `.env.example`, produced four real example reports (`docs/examples/`), and updated `specs/agent-workflows.md`/`data-contracts.md`/`acceptance-criteria.md` to remove superseded HTML-retrieval/parsing and `RetrievalResult` descriptions. Not yet committed to version control (deliberate — commits in this project are made manually by the project owner). | Final repository review for submission readiness surfaced several real gaps (stale docs, a broken clean-install path, missing AC-111 example config) that needed fixing, not just noting. |
+| 0.8 | Phase 11 | Refreshed `docs/architecture.md`/`.mmd`/`.png`, wrote `CLAUDE.md` (renamed from `COPILOT.md`), fully rewrote `README.md`, fixed a clean-environment install gap (`pyproject.toml` was empty), added `.env.example`, produced four real example reports (`docs/examples/`), and updated `specs/agent-workflows.md`/`data-contracts.md`/`acceptance-criteria.md` to remove superseded HTML-retrieval/parsing and `RetrievalResult` descriptions. | Final repository review for submission readiness surfaced several real gaps (stale docs, a broken clean-install path, missing AC-111 example config) that needed fixing, not just noting. |
+| 0.9 | Phase 12 | Added Phase 12 (Post-Submission Corrections). Marked Phase 11 Completed. First correction scoped: same-source evidence deduplication in Evidence Validation, triggered by grading-interview feedback. | Grading interview identified that same-source projections and actuals for the same reporting period were being treated as conflicting evidence rather than being deduplicated to the most recently published record. |
 
 ## Next Planned Work
 
 The active phase is:
 
 ```text
-Phase 11: Documentation and Submission Preparation
+Phase 12: Post-Submission Corrections
 ```
 
 The remaining work is:
 
-1. Commit all Phase 11 changes to version control.
-2. Walk through the codebase with the project owner before submission.
-3. Package the repository for submission (the one remaining Phase 11
-   deliverable).
+1. Implement same-source evidence deduplication pre-pass in Evidence
+   Validation (`src/fin_automation/workflow/evidence_validation_agent.py`).
+2. Write tests covering: same-source same-period (keeps latest),
+   same-source different-period (keeps both), ambiguous publication date
+   (keeps both).
+3. Update `docs/test-results.md` with the new test count.
+4. Package the repository for final submission (deferred from Phase 11,
+   still outstanding).
