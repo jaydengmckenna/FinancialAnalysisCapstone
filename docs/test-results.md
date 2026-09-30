@@ -24,7 +24,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 ## Result
 
 ```
-356 passed in 2.54s
+359 passed in 2.88s
 ```
 
 0 failed, 0 errors, 0 skipped.
@@ -41,7 +41,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 | `tests/test_models/test_reports.py` | 23 |
 | `tests/prompts/test_intake_prompts.py` | 22 |
 | `tests/test_models/test_sources.py` | 21 |
-| `tests/tools/test_evidence_validation.py` | 18 |
+| `tests/tools/test_evidence_validation.py` | 21 |
 | `tests/test_models/test_research.py` | 17 |
 | `tests/workflow/test_orchestrator.py` | 14 |
 | `tests/tools/test_financial_data.py` | 11 |
@@ -60,7 +60,7 @@ A saved, point-in-time record of a full test suite run, per Phase 10's
 | `tests/prompts/test_evidence_extraction_prompt.py` | 2 |
 | `tests/tools/test_evidence_submission.py` | 1 |
 | `tests/test_main.py` | 1 |
-| **Total** | **356** |
+| **Total** | **359** |
 
 ## Reproducing this result
 

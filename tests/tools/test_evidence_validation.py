@@ -35,11 +35,31 @@ from fin_automation.models.sources import (
     ExtractedEvidence,
     SourceRecord,
 )
+import datetime
 from fin_automation.models.validation import ValidationClaim
 from fin_automation.tools.evidence_validation import (
     EvidenceValidationService,
     ValidationCorrectionRouter,
 )
+
+
+def _make_source(
+    *,
+    workflow_id,
+    url: str,
+    publication_date: datetime.date | None = None,
+) -> SourceRecord:
+    return SourceRecord(
+        workflow_id=workflow_id,
+        search_result_id=uuid4(),
+        title="Test source",
+        url=url,
+        retrieval_date=datetime.date.today(),
+        source_category=SourceCategory.PRIMARY,
+        parsing_status="success",
+        content_summary="Test content summary.",
+        publication_date=publication_date,
+    )
 
 
 def make_context() -> dict[str, object]:
@@ -420,6 +440,120 @@ def test_conflicting_evidence_warning_does_not_block_approval() -> None:
         finding.category == ValidationCategory.UNDISCLOSED_CONFLICT
         for finding in result.findings
     )
+
+
+def test_dedup_same_source_same_period_keeps_only_latest() -> None:
+    """Two records from the same hostname for the same candidate, metric,
+    and period where both sources have a publication_date must be reduced
+    to the most recently published one — the earlier record is superseded
+    and should not reach conflict detection."""
+
+    workflow_id = uuid4()
+    source_old = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/old",
+        publication_date=datetime.date(2025, 1, 1),
+    )
+    source_new = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/new",
+        publication_date=datetime.date(2025, 3, 1),
+    )
+    evidence_old = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_old.source_id,
+        value=Decimal("100"),
+        reporting_period="FY2025",
+    )
+    evidence_new = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_new.source_id,
+        value=Decimal("110"),
+        reporting_period="FY2025",
+    )
+
+    result = EvidenceValidationService._deduplicate_same_source_evidence(
+        source_records=[source_old, source_new],
+        evidence_records=[evidence_old, evidence_new],
+    )
+
+    assert len(result) == 1
+    assert result[0].evidence_id == evidence_new.evidence_id
+
+
+def test_dedup_same_source_different_period_keeps_both() -> None:
+    """Two records from the same hostname for different reporting periods
+    are not the same fact — both must survive deduplication so neither
+    period's data is silently discarded."""
+
+    workflow_id = uuid4()
+    source_a = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/a",
+        publication_date=datetime.date(2024, 3, 1),
+    )
+    source_b = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/b",
+        publication_date=datetime.date(2025, 3, 1),
+    )
+    evidence_fy2024 = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_a.source_id,
+        value=Decimal("100"),
+        reporting_period="FY2024",
+    )
+    evidence_fy2025 = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_b.source_id,
+        value=Decimal("110"),
+        reporting_period="FY2025",
+    )
+
+    result = EvidenceValidationService._deduplicate_same_source_evidence(
+        source_records=[source_a, source_b],
+        evidence_records=[evidence_fy2024, evidence_fy2025],
+    )
+
+    assert len(result) == 2
+
+
+def test_dedup_ambiguous_publication_date_keeps_both() -> None:
+    """When any source in a same-hostname, same-period group lacks a
+    publication_date, the group cannot be ordered — both records must
+    survive so the existing conflict-detection logic can flag them for
+    human review rather than silently dropping one."""
+
+    workflow_id = uuid4()
+    source_dated = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/dated",
+        publication_date=datetime.date(2025, 1, 1),
+    )
+    source_undated = _make_source(
+        workflow_id=workflow_id,
+        url="https://finance.yahoo.com/undated",
+        publication_date=None,
+    )
+    evidence_dated = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_dated.source_id,
+        value=Decimal("100"),
+        reporting_period="FY2025",
+    )
+    evidence_undated = _make_evidence(
+        workflow_id=workflow_id,
+        source_id=source_undated.source_id,
+        value=Decimal("110"),
+        reporting_period="FY2025",
+    )
+
+    result = EvidenceValidationService._deduplicate_same_source_evidence(
+        source_records=[source_dated, source_undated],
+        evidence_records=[evidence_dated, evidence_undated],
+    )
+
+    assert len(result) == 2
 
 
 def test_supported_calculated_claim_is_approved() -> None:

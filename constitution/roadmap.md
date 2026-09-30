@@ -2246,7 +2246,7 @@ no new capabilities are added.
 
 ### Planned Deliverables
 
-- [ ] **Same-source evidence deduplication.** When multiple evidence
+- [x] **Same-source evidence deduplication.** When multiple evidence
       records share the same `domain`, `evidence_type`, and
       `reporting_period`, keep only the record with the most recent
       `publication_date`. Records where `publication_date` is `None` on
@@ -2261,12 +2261,12 @@ no new capabilities are added.
 
 Phase 12 is complete when:
 
-- [ ] The deduplication pre-pass is implemented in Evidence Validation.
-- [ ] Existing 356 tests continue to pass.
-- [ ] New tests cover: same-source same-period deduplication (keeps
+- [x] The deduplication pre-pass is implemented in Evidence Validation.
+- [x] Existing 356 tests continue to pass (359 total after new tests).
+- [x] New tests cover: same-source same-period deduplication (keeps
       latest), same-source different-period (both kept), ambiguous date
       (both kept, current logic applies).
-- [ ] `docs/test-results.md` is updated to reflect the new test count.
+- [x] `docs/test-results.md` is updated to reflect the new test count.
 
 ### Dependencies
 
@@ -2392,11 +2392,5 @@ Phase 12: Post-Submission Corrections
 
 The remaining work is:
 
-1. Implement same-source evidence deduplication pre-pass in Evidence
-   Validation (`src/fin_automation/workflow/evidence_validation_agent.py`).
-2. Write tests covering: same-source same-period (keeps latest),
-   same-source different-period (keeps both), ambiguous publication date
-   (keeps both).
-3. Update `docs/test-results.md` with the new test count.
-4. Package the repository for final submission (deferred from Phase 11,
+1. Package the repository for final submission (deferred from Phase 11,
    still outstanding).

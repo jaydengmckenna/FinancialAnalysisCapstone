@@ -3,7 +3,9 @@
 from decimal import Decimal
 import re
 from collections.abc import Iterable
-from typing import TypeVar
+from datetime import date
+from typing import TypeVar, cast
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fin_automation.models.financial import (
@@ -97,7 +99,11 @@ class EvidenceValidationService:
         )
         self._check_conflicting_evidence(
             workflow_id=workflow_id,
-            evidence_records=evidence_records,
+            #called here
+            evidence_records=self._deduplicate_same_source_evidence(
+                source_records=source_records,
+                evidence_records=evidence_records,
+            ),
             findings=findings,
         )
         self._check_claims(
@@ -219,6 +225,87 @@ class EvidenceValidationService:
                         target=CorrectionTarget.ORCHESTRATOR,
                     )
                 )
+
+    @staticmethod
+    def _deduplicate_same_source_evidence(
+        *,
+        source_records: list[SourceRecord],
+        evidence_records: list[ExtractedEvidence],
+    ) -> list[ExtractedEvidence]:
+        """Remove superseded same-source evidence for the same metric and period.
+
+        Within any group sharing the same URL hostname, candidate, metric,
+        and reporting period: if every record in the group has a non-null
+        publication_date on its source, keep only the most recently published
+        one. Groups where any member lacks a publication_date are left
+        untouched so the existing conflict-detection logic handles them.
+
+        Records with no matching source, no candidate name, or no reported
+        value cannot be grouped and pass through unchanged.
+        """
+        #create a dict of sources for easy lookup
+        sources_by_id = {s.source_id: s for s in source_records}
+        metric_tool = FinancialDataTool()
+
+        #buckets to decide if sources should pass through (ungroupable) 
+        #   or if they should go thorugh deduplication (groupable)
+        grouped: dict[tuple, list[ExtractedEvidence]] = {}
+        ungroupable: list[ExtractedEvidence] = []
+
+        #build buckets
+        for record in evidence_records:
+            source = sources_by_id.get(record.source_id)
+            # allow non numeric evidence and general market research to pass automatically
+            if source is None or not record.candidate_name or record.reported_value is None:
+                ungroupable.append(record)
+                continue
+
+            #safety guard. if this executes there is a problem upstream.
+            hostname = urlparse(str(source.url)).hostname or ""
+            if not hostname:
+                ungroupable.append(record)
+                continue
+
+            #get the normalized metric
+            metric_key = (
+                metric_tool.resolve_metric_row(record.evidence_type)
+                or record.evidence_type.casefold()
+            )
+            # create the key for set  key: hostname + candidate_name + metric_key
+            #   similar logic used in yfinance
+            key = (
+                hostname.casefold(),
+                record.candidate_name.casefold(),
+                metric_key,
+                (record.reporting_period or "").casefold(),
+            )
+            grouped.setdefault(key, []).append(record)
+
+        #append sources that pass
+        result = list(ungroupable)
+
+        #pass through deduplication sources
+        for records_in_group in grouped.values():
+            #if the grouped records only have one source there is no deduplication needed. pass.
+            if len(records_in_group) <= 1:
+                result.extend(records_in_group)
+                continue
+
+            #if there is no publication dates on the groupings we will keep both sources and use existing fallback conflict detection
+            sources = [sources_by_id[r.source_id] for r in records_in_group]
+            if any(s.publication_date is None for s in sources):
+                result.extend(records_in_group)
+                continue
+
+            #metadata is stored on which is lattest, we will always store latest info as source true info
+            latest = max(
+                records_in_group,
+                key=lambda r: cast(date, sources_by_id[r.source_id].publication_date),
+            )
+            result.append(latest)
+
+        #return total list of deduplicated sources
+        return result
 
     @staticmethod
     def _check_conflicting_evidence(
